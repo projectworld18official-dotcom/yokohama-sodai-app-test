@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b6e4f">
+<title>横浜市 粗大ごみナビ（試作）</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="appbar">
+  <h1>横浜市 粗大ごみナビ</h1>
+  <p class="sub">写真から判定・手数料・申込み手順まで（試作版）</p>
+</header>
+
+<nav class="stepper" aria-label="進行状況">
+  <ol>
+    <li data-step="1" class="active">写真</li>
+    <li data-step="2">品目</li>
+    <li data-step="3">サイズ</li>
+    <li data-step="4">結果</li>
+  </ol>
+</nav>
+
+<main>
+  <!-- STEP 1: 写真 -->
+  <section id="step1" class="card step">
+    <h2>1. 出したい物の写真を撮る</h2>
+    <p class="hint">最低 <strong id="minPhotosLabel">2</strong> 枚必要です。<br>例：①全体（正面） ②側面・裏面（素材表示やラベルがわかる面）。何枚でも追加できます。</p>
+    <div class="btnrow">
+      <label class="btn primary file-btn">📷 カメラで撮影
+        <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
+      </label>
+      <label class="btn file-btn">🖼 写真を選ぶ
+        <input id="galleryInput" type="file" accept="image/*" multiple hidden>
+      </label>
+    </div>
+    <div id="thumbs" class="thumbs" aria-live="polite"></div>
+    <p id="photoStatus" class="status"></p>
+
+    <div id="grokSection" class="grok" hidden>
+      <h3>🤖 Grokで写真を調べる（おすすめ・任意）</h3>
+      <p class="hint">品目名がわからないときは、AIの「Grok」に写真を見せると、品目名・素材・おおよそのサイズの見当をつけてくれます。使わなくても大丈夫です。そのまま「次へ」で一覧から選べます。</p>
+      <div class="about-grok">
+        <p class="about-title">Grokとは？</p>
+        <p>xAIが提供するAIアシスタントです。ブラウザ（grok.com）とiPhone・Androidアプリで使えます。<b>無料プラン（0円）があり</b>、写真を添付して質問すると、写っている物について答えてくれます。</p>
+        <p class="hint">無料プランは利用回数に上限があります（具体的な回数は公式に非公開）。アカウント登録なしで使える場合もありますが、地域や機能によっては無料のアカウント登録（Google・Apple・X・メールなど）が必要です。登録しておくと履歴も残って便利です。</p>
+        <p class="hint">はじめての方：アプリを入れるか、インストール不要のブラウザ版をどうぞ。</p>
+        <div class="store-btns">
+          <a id="storeIos" class="btn store" href="https://apps.apple.com/jp/app/grok/id6670324846" target="_blank" rel="noopener">📱 iPhone版（App Store）</a>
+          <a id="storeAndroid" class="btn store" href="https://play.google.com/store/apps/details?id=ai.x.grok&amp;hl=ja" target="_blank" rel="noopener">▶ Android版（Google Play）</a>
+          <a id="storeWeb" class="btn store" href="https://grok.com" target="_blank" rel="noopener">🌐 インストールせずブラウザで使う（grok.com）</a>
+        </div>
+      </div>
+      <ol class="mini-steps">
+        <li><b>Grokで新しいチャットを開き、写真を2枚だけ添付</b>（＋ボタンから。全体と、素材・ラベルがわかる面）</li>
+        <li><b>下の文章をコピーして貼り付け</b>、1回だけ送信</li>
+        <li><b>Grokの回答をコピー</b>して、下の欄に貼り付け</li>
+      </ol>
+      <p class="hint">無料プランで足りるよう、1回のメッセージ（写真2枚＋文章）で済む内容にしています。画像生成・DeepSearch等の機能は不要です。上限に達した場合は時間をおくか、この画面の一覧から手動で選んでください。</p>
+      <label class="field">Grokに送る文章
+        <textarea id="grokPrompt" class="prompt" readonly rows="7"></textarea>
+      </label>
+      <div class="btnrow">
+        <button id="copyPrompt" type="button" class="btn primary">📋 文章をコピー</button>
+        <a id="openGrok" class="btn" href="https://grok.com" target="_blank" rel="noopener">Grokを開く ↗</a>
+      </div>
+      <div class="btnrow" id="shareRow" hidden>
+        <button id="sharePhotos" type="button" class="btn">📤 写真を共有（Grokアプリへ）</button>
+      </div>
+      <p id="copyStatus" class="status" aria-live="polite"></p>
+
+      <label class="field">Grokの回答を貼り付け
+        <textarea id="grokReply" rows="6" placeholder="品目名：たんす&#10;主な素材：木&#10;縦：45cm&#10;横：120cm&#10;高さ：180cm&#10;…"></textarea>
+      </label>
+      <div class="btnrow">
+        <button id="pasteReply" type="button" class="btn">📥 クリップボードから貼り付け</button>
+        <button id="parseReply" type="button" class="btn primary">回答を読み取る</button>
+      </div>
+      <div id="parsedBox" class="parsed" hidden></div>
+      <p class="caution">⚠ AIの推定は間違うことがあります。品目と寸法は次の画面で必ず確認・修正してください（寸法は<b>実測推奨</b>）。粗大ごみかどうかの判定と手数料は、<b>横浜市の公式データ</b>で計算します。</p>
+    </div>
+    <div class="actions">
+      <button id="toStep2" class="btn primary wide" disabled>次へ（品目を特定）</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: 品目 -->
+  <section id="step2" class="card step" hidden>
+    <h2>2. 品目を確認する</h2>
+    <div id="recogBox" class="notice"></div>
+    <div id="aiCandidates" class="chips"></div>
+    <label class="field">品目名で検索（例：ソファ、自転車、たんす）
+      <input id="searchInput" type="search" placeholder="品目名・キーワード" autocomplete="off">
+    </label>
+    <div class="chips" id="categoryChips"></div>
+    <ul id="results" class="results"></ul>
+    <details class="na-box">
+      <summary>市で回収できない物（エアコン・テレビ・冷蔵庫・洗濯機・パソコン・バイク等）</summary>
+      <ul id="naList" class="results"></ul>
+    </details>
+    <button id="notInList" class="btn ghost wide">一覧に見つからない</button>
+
+    <div id="materialBox" hidden>
+      <h3>主な素材を選んでください</h3>
+      <p class="hint">一番多く使われている素材を選択（例：脚がすべて金属のイス・机は「金属」）。</p>
+      <div id="materialOptions" class="radios"></div>
+    </div>
+    <div class="selected" id="selectedItem" hidden></div>
+    <div class="actions">
+      <button class="btn" data-back="1">戻る</button>
+      <button id="toStep3" class="btn primary" disabled>次へ（サイズ入力）</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: サイズ -->
+  <section id="step3" class="card step" hidden>
+    <h2>3. おおよそのサイズ（cm）</h2>
+    <p class="hint">メジャーで測った目安で構いません。3つとも必須です。この寸法と公式の基準で判定します。</p>
+    <form id="dimForm" novalidate>
+      <div class="dims">
+        <label class="field">縦<input id="dimD" inputmode="decimal" type="number" min="1" max="1000" step="any" required placeholder="例 45"><span class="unit">cm</span></label>
+        <label class="field">横<input id="dimW" inputmode="decimal" type="number" min="1" max="1000" step="any" required placeholder="例 180"><span class="unit">cm</span></label>
+        <label class="field">高さ<input id="dimH" inputmode="decimal" type="number" min="1" max="1000" step="any" required placeholder="例 80"><span class="unit">cm</span></label>
+      </div>
+      <label id="dimConfirmBox" class="confirm" hidden><input id="dimConfirm" type="checkbox"> Grokの推定値を実測（または目視）で確認・修正しました</label>
+      <p id="dimError" class="error" role="alert"></p>
+      <p id="dimInfo" class="hint"></p>
+      <div id="unknownMaterialBox" hidden>
+        <h3>主な素材</h3>
+        <div class="radios">
+          <label><input type="radio" name="umat" value="metal"> 金属（鉄・アルミ・ステンレス等）</label>
+          <label><input type="radio" name="umat" value="burnable"> 金属以外（木・プラスチック・布等）</label>
+          <label><input type="radio" name="umat" value="nonburnable"> 金属以外（陶磁器・石・ガラス等）</label>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" data-back="2">戻る</button>
+        <button id="toStep4" type="submit" class="btn primary">判定する</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- STEP 4: 結果 -->
+  <section id="step4" class="card step" hidden>
+    <h2>4. 判定結果</h2>
+    <div id="resultBox"></div>
+    <div class="actions">
+      <button class="btn" data-back="3">サイズを修正</button>
+      <button id="restart" class="btn primary">最初からやり直す</button>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p>情報源：横浜市公式サイト・横浜市粗大ごみインターネット受付（<span id="dataDate">2026-10-12</span> 取得）。手数料・ルールは変更される場合があります。申込み時に公式の金額をご確認ください。本アプリは横浜市の公式アプリではありません。</p>
+  </footer>
+</main>
+
+<script src="recognizer.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
