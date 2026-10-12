@@ -24,12 +24,12 @@
 写真が2枚以上になると「Grokで写真を調べる」欄が表示されます（任意。使わずに一覧から手動で選んでもOK）。
 1. 「Grokとは？」の紹介、iPhone（App Store）/ Android（Google Play）/ ブラウザ（grok.com）への導線（端末をUAで判定して強調）
 2. 定型プロンプトをワンタップでコピー（navigator.clipboard、非対応時は execCommand('copy')）、grok.com を新しいタブで開く
-3. Web Share API（navigator.canShare({files})）対応端末では「写真を共有」で写真2枚をGrokアプリへ送れる
+3. 写真①②をcanvasで横並び1枚のJPEG（sodai-photos.jpg、高さ約1024px、2MB以下）にまとめる。Web Share API対応端末は「写真を共有」でその1枚をGrokアプリへ（Grokアプリは共有で1枚しか受け付けないため）、ブラウザ利用者は「まとめ画像を保存」して添付
 4. Grokの回答を貼り付け →「回答を読み取る」で、品目名・素材・縦横高さ・回収対象外の可能性を解析（recognizer.js の SodaiGrokGuide.parseReply）
 5. 品目ステップで公式品目一覧の候補を提示、素材を事前選択、サイズ欄に推定値を仮入力（黄色）。推定値を使った場合は「確認しました」チェックが必須
 6. 判定・手数料は常に横浜市公式データ（data/fees.json, data/rules.json）で計算
 
-無料プランで足りるよう、1回のメッセージ（写真2枚＋文章1つ）で完結する設計です。画像生成・DeepSearch等は使いません。
+無料プランで足りるよう、1回のメッセージ（まとめ画像1枚＋文章1つ）で完結する設計です。画像生成・DeepSearch等は使いません。
 
 ### 自動認識に差し替える場合（任意）
 `window.SodaiRecognizer.recognize(files, catalog, { grokReply })` が同じ形
@@ -38,3 +38,6 @@ recognizer.js より後に読み込むスクリプトで差し替えられます
 
 ## 注意
 本アプリは横浜市の公式アプリではありません。手数料・ルールは変更される可能性があり、申込み時の公式表示が正です。
+
+## LINE申込み
+粗大ごみ判定の結果画面に「LINEで申し込む（横浜市公式）」ボタン。タップで申し込みメモ（品目・公式品目名・素材・寸法・個数・手数料・支払い方法）をコピー＆画面表示し、横浜市LINE公式アカウント（@cityofyokohama, https://page.line.me/314eefow?openQrModal=true ／出典 https://www.city.yokohama.lg.jp/city-info/koho-kocho/koho/sns/line/line-official.html ）を開く。メニュー「粗大ごみ」から申込み。収集申込みはクレジットカード／PayPayの電子決済可。

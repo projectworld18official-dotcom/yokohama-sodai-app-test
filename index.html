@@ -32,14 +32,18 @@
     <p class="hint">最低 <strong id="minPhotosLabel">2</strong> 枚必要です。<br>例：①全体（正面） ②側面・裏面（素材表示やラベルがわかる面）。何枚でも追加できます。</p>
     <div class="btnrow">
       <label class="btn primary file-btn">📷 カメラで撮影
-        <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
+        <input id="cameraInput" type="file" accept="image/*,.heic,.heif" capture="environment" hidden>
       </label>
       <label class="btn file-btn">🖼 写真を選ぶ
-        <input id="galleryInput" type="file" accept="image/*" multiple hidden>
+        <input id="galleryInput" type="file" accept="image/*,.heic,.heif" multiple hidden>
       </label>
     </div>
     <div id="thumbs" class="thumbs" aria-live="polite"></div>
     <p id="photoStatus" class="status"></p>
+    <div class="actions">
+      <button id="toStep2" class="btn primary wide" disabled>次へ（品目を選ぶ）</button>
+    </div>
+    <p id="grokJump" class="jump" hidden><a href="#grokSection">🤖 品目名がわからないときは、Grokで写真を調べる（任意）↓</a></p>
 
     <div id="grokSection" class="grok" hidden>
       <h3>🤖 Grokで写真を調べる（おすすめ・任意）</h3>
@@ -56,11 +60,11 @@
         </div>
       </div>
       <ol class="mini-steps">
-        <li><b>Grokで新しいチャットを開き、写真を2枚だけ添付</b>（＋ボタンから。全体と、素材・ラベルがわかる面）</li>
+        <li><b>写真2枚を1枚にまとめた画像をGrokに添付</b>：アプリなら下の「写真を共有」でGrokを選択。ブラウザ（grok.com）なら「まとめ画像を保存」してから、Grokの＋ボタンでその1枚を添付</li>
         <li><b>下の文章をコピーして貼り付け</b>、1回だけ送信</li>
         <li><b>Grokの回答をコピー</b>して、下の欄に貼り付け</li>
       </ol>
-      <p class="hint">無料プランで足りるよう、1回のメッセージ（写真2枚＋文章）で済む内容にしています。画像生成・DeepSearch等の機能は不要です。上限に達した場合は時間をおくか、この画面の一覧から手動で選んでください。</p>
+      <p class="hint">無料プランで足りるよう、1回のメッセージ（まとめ画像1枚＋文章）で済む内容にしています。画像生成・DeepSearch等の機能は不要です。上限に達した場合は時間をおくか、この画面の一覧から手動で選んでください。</p>
       <label class="field">Grokに送る文章
         <textarea id="grokPrompt" class="prompt" readonly rows="7"></textarea>
       </label>
@@ -68,8 +72,13 @@
         <button id="copyPrompt" type="button" class="btn primary">📋 文章をコピー</button>
         <a id="openGrok" class="btn" href="https://grok.com" target="_blank" rel="noopener">Grokを開く ↗</a>
       </div>
-      <div class="btnrow" id="shareRow" hidden>
-        <button id="sharePhotos" type="button" class="btn">📤 写真を共有（Grokアプリへ）</button>
+      <div class="combined">
+        <img id="combinedPreview" alt="まとめ画像のプレビュー（①左・②右）" hidden>
+        <p id="combinedInfo" class="hint">まとめ画像を作成中…</p>
+      </div>
+      <div class="btnrow">
+        <button id="sharePhotos" type="button" class="btn" hidden>📤 写真を共有（Grokアプリへ）</button>
+        <a id="saveCombined" class="btn" download="sodai-photos.jpg" href="#" aria-disabled="true">💾 まとめ画像を保存</a>
       </div>
       <p id="copyStatus" class="status" aria-live="polite"></p>
 
@@ -82,9 +91,9 @@
       </div>
       <div id="parsedBox" class="parsed" hidden></div>
       <p class="caution">⚠ AIの推定は間違うことがあります。品目と寸法は次の画面で必ず確認・修正してください（寸法は<b>実測推奨</b>）。粗大ごみかどうかの判定と手数料は、<b>横浜市の公式データ</b>で計算します。</p>
-    </div>
-    <div class="actions">
-      <button id="toStep2" class="btn primary wide" disabled>次へ（品目を特定）</button>
+      <div class="actions">
+        <button id="toStep2b" class="btn primary wide">次へ（品目を選ぶ）</button>
+      </div>
     </div>
   </section>
 
@@ -155,10 +164,11 @@
   </section>
 
   <footer class="foot">
-    <p>情報源：横浜市公式サイト・横浜市粗大ごみインターネット受付（<span id="dataDate">2026-10-12</span> 取得）。手数料・ルールは変更される場合があります。申込み時に公式の金額をご確認ください。本アプリは横浜市の公式アプリではありません。</p>
+    <p>情報源：横浜市公式サイト・横浜市粗大ごみインターネット受付（<span id="dataDate">2026-10-12</span> 取得）。手数料・ルールは変更される場合があります。申込み時に公式の金額をご確認ください。本アプリは横浜市の公式アプリではありません。<br>バージョン <span id="appVersion"></span></p>
   </footer>
 </main>
 
+<div id="updateBar" class="update-bar" role="status" hidden>新しいバージョンがあります <button id="reloadBtn" type="button" class="btn">更新する</button></div>
 <script src="recognizer.js"></script>
 <script src="app.js"></script>
 </body>
