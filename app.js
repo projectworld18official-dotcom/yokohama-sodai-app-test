@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  const APP_VERSION = '2026-10-12.5';
+  const APP_VERSION = '2026-10-12.6';
   const MIN_PHOTOS = 2, MAX_PHOTOS = 4, MAX_FILE_MB = 40, MAX_EDGE = 1600, PHOTO_TTL_MS = 24 * 3600 * 1000;
   const SKEY = 'yokohama-sodai:v5';
   const L$ = window.SodaiLogic, G = window.SodaiGrokGuide;
@@ -63,7 +63,7 @@
     $('#resumeBar').hidden = true;
     $('#keepPhotos').checked = !!S.keepPhotos;
     if (S.keepPhotos) await restorePhotos();
-    $('#q').value = S.q || ''; $('#longest').value = S.longest || '';
+    $('#q').value = S.q || '';
     $('#dimD').value = S.dims.d || ''; $('#dimW').value = S.dims.w || ''; $('#dimH').value = S.dims.h || '';
     $('#grokReply').value = S.grokReply || '';
     if (S.grokReply) parseGrok(true);
@@ -181,12 +181,12 @@
   }
 
   // ---------- 大きさ ----------
-  function lengthCm() { return G.parseLengthCm(S.longest); }
+  function lengthCm() { const v = G.parseLengthCm(S.longest); return v > 0 && v <= 1000 ? v : null; }
   function prepSize() {
     const g = group();
     $('#sizeItem').innerHTML = S.notInList ? '品目：<b>一覧にない物</b>' : `品目：<b>${esc(g.baseName)}</b>`;
     $('#itemNotes').innerHTML = g ? notesHtml(g) : '';
-    $('#longest').value = S.longest; $('#dimD').value = S.dims.d; $('#dimW').value = S.dims.w; $('#dimH').value = S.dims.h;
+    $('#dimD').value = S.dims.d; $('#dimW').value = S.dims.w; $('#dimH').value = S.dims.h;
     $$('input[name=mat]').forEach(r => r.checked = r.value === S.mat);
     $$('input[name=bat]').forEach(r => r.checked = r.value === S.bat);
     $('#batDamaged').checked = !!S.batDamaged;
@@ -199,8 +199,8 @@
     return `<div class="notes"><p class="lead">品目一覧の注意書き</p>${notes.map(n => `<p>${esc(n)}</p>`).join('')}</div>`;
   }
   function readSize() {
-    S.longest = $('#longest').value.trim();
     S.dims = { d: $('#dimD').value.trim(), w: $('#dimW').value.trim(), h: $('#dimH').value.trim() };
+    const dc = dimsCm(); S.longest = [dc.d, dc.w, dc.h].every(v => v > 0) ? String(Math.max(dc.d, dc.w, dc.h)) : '';
     S.mat = ($('input[name=mat]:checked') || {}).value || null;
     S.bat = ($('input[name=bat]:checked') || {}).value || null;
     S.batDamaged = $('#batDamaged').checked;
@@ -210,14 +210,15 @@
   function updateSizeUI(strict) {
     readSize();
     const g = group(), L = lengthCm(), errs = [];
-    const info = $('#longestInfo');
-    if (S.longest && L == null) errs.push('一番長い辺は数字で入力してください（例：120、1.2m）');
-    else if (L != null && (L <= 0 || L > 1000)) errs.push('一番長い辺は0より大きく1000cm以下で入力してください');
-    else if (L != null && /[a-zA-Zａ-ｚ]|ミリ|メートル/.test(S.longest)) info.textContent = `＝ ${L}cm として計算します`;
-    else if (strict && L == null) errs.push('一番長い辺を入力してください');
-    const dd = dimsCm(), dv = [dd.d, dd.w, dd.h];
-    if ([S.dims.d, S.dims.w, S.dims.h].some((s, i) => s && dv[i] == null)) errs.push('縦・横・高さは数字で入力してください');
-    else if (L > 0 && dv.some(v => v != null && v > L)) errs.push('縦・横・高さのどれかが「一番長い辺」より長くなっています。測り直してください');
+    const names = { d: '縦', w: '横', h: '高さ' }, dd = dimsCm();
+    for (const k of ['d', 'w', 'h']) {
+      const raw = S.dims[k], v = dd[k]; let bad = false;
+      if (!raw) { if (strict) { errs.push(`${names[k]}を入力してください`); bad = true; } }
+      else if (v == null) { errs.push(`${names[k]}は数字で入力してください（例：120、1.2m）`); bad = true; }
+      else if (v <= 0 || v > 1000) { errs.push(`${names[k]}は0より大きく1000cm以下で入力してください`); bad = true; }
+      $({ d: '#dimD', w: '#dimW', h: '#dimH' }[k]).classList.toggle('invalid', bad);
+    }
+    $('#longestOut').textContent = L ? `${L}cm` : '—';
     const ok = L > 0 && L <= 1000;
     const ask = ok && L$.needsMaterialQuestion(S.notInList ? null : g, L, D.rules, S.mat === 'unknown' ? null : S.mat);
     $('#matQ').hidden = !(ok && (ask || S.mat) && L >= D.rules.definition.metalThresholdCm && L < D.rules.definition.nonMetalThresholdCm && (S.notInList || L$.thresholdClass(g, null) === 'ask'));
@@ -441,7 +442,7 @@
     clearStoredPhotos();
     Object.assign(S, { screen: 'home', route: 'name', q: '', groupKey: null, naKey: null, notInList: false, longest: '', dims: { d: '', w: '', h: '' }, grokReply: '', wiz: 1, candidates: null, keepPhotos: false });
     resetInputs();
-    ['#homeQ', '#q', '#longest', '#dimD', '#dimW', '#dimH', '#grokReply'].forEach(id => $(id).value = '');
+    ['#homeQ', '#q', '#dimD', '#dimW', '#dimH', '#grokReply'].forEach(id => $(id).value = '');
     $('#keepPhotos').checked = false; $('#aiConsent').checked = false; $('#parsedBox').hidden = true; $('#cands').hidden = true;
     renderThumbs(); setWiz(1); clearSaved();
     history.replaceState({ screen: 'home', idx: 0 }, ''); show('home', true);

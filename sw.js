@@ -1,6 +1,6 @@
 /* 横浜市 粗大ごみナビ Service Worker */
 const PREFIX = 'yokohama-sodai-nav-';
-const VERSION = '2026-10-12.5';
+const VERSION = '2026-10-12.6';
 const CACHE = PREFIX + VERSION;
 const ASSETS = ['./', 'index.html', 'style.css', 'logic.js', 'recognizer.js', 'app.js', 'manifest.webmanifest', 'data/fees.json', 'data/rules.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 

@@ -137,16 +137,14 @@
       <figure class="measure" aria-hidden="true">
         <svg viewBox="0 0 220 120" width="220" height="120"><polygon points="30,40 150,40 190,20 70,20" fill="#e7f4ee" stroke="#0b6e4f"/><polygon points="30,40 150,40 150,100 30,100" fill="#f4faf7" stroke="#0b6e4f"/><polygon points="150,40 190,20 190,80 150,100" fill="#dceee5" stroke="#0b6e4f"/><line x1="30" y1="110" x2="150" y2="110" stroke="#b42318" stroke-width="4"/><text x="90" y="119" font-size="11" text-anchor="middle" fill="#b42318">一番長い辺</text></svg>
       </figure>
-      <label class="field" for="longest">一番長い辺（cm）<span class="req">必須</span></label>
-      <input id="longest" type="text" inputmode="decimal" autocomplete="off" placeholder="例 120" aria-describedby="longestInfo">
+      <p class="lead">縦・横・高さ（cm）<span class="req">3つとも必須</span></p>
+      <div class="dims">
+        <label class="field">縦<input id="dimD" type="text" inputmode="decimal" autocomplete="off" placeholder="cm"></label>
+        <label class="field">横<input id="dimW" type="text" inputmode="decimal" autocomplete="off" placeholder="cm"></label>
+        <label class="field">高さ<input id="dimH" type="text" inputmode="decimal" autocomplete="off" placeholder="cm"></label>
+      </div>
+      <p class="longest-out">一番長い辺：<output id="longestOut" aria-live="polite">—</output>（3つのうち最大の値・自動）</p>
       <p id="longestInfo" class="hint">メジャーで、斜めではなく辺の長さを測ります。「1.2m」「800mm」とも入力できます。スマホの計測アプリ（iPhoneの「計測」など）は誤差があるため、メジャーをおすすめします。</p>
-      <details class="sub"><summary>縦・横・高さも入れる（任意・申し込みメモに入ります）</summary>
-        <div class="dims">
-          <label class="field">縦<input id="dimD" type="text" inputmode="decimal" placeholder="cm"></label>
-          <label class="field">横<input id="dimW" type="text" inputmode="decimal" placeholder="cm"></label>
-          <label class="field">高さ<input id="dimH" type="text" inputmode="decimal" placeholder="cm"></label>
-        </div>
-      </details>
       <div id="nearWarn" class="warn" role="status" hidden></div>
       <fieldset id="matQ" class="q" hidden>
         <legend>主な素材は？</legend>

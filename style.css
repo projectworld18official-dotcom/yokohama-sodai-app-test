@@ -123,3 +123,5 @@ details>summary{list-style:none}details>summary::-webkit-details-marker{display:
 details>summary::before{content:"▶";display:inline-block;margin-right:8px;font-size:.8em;color:var(--g);transition:transform .15s}
 details[open]>summary::before{transform:rotate(90deg)}
 details.more,details.sub{border:2px solid var(--bd);border-radius:12px;padding:0 12px;margin:10px 0}
+.longest-out{font-size:1.1rem;font-weight:800;margin:8px 0}.longest-out output{color:var(--g)}
+input.invalid{border-color:var(--red);background:var(--red2)}
