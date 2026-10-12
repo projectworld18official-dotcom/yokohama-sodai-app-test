@@ -1,576 +1,640 @@
 'use strict';
 (() => {
-  const APP_VERSION = '2026-10-12.4';
-  const MIN_PHOTOS = 2;
-  const MAX_FILE_MB = 40;
-  const MAX_PHOTOS = 10;
-  const MAX_DIM_CM = 1000;
-  const MAT_LABEL = { metal: '金属・資源物', burnable: '木・プラ等・燃やすもの', nonburnable: '陶磁器・石等・燃えないもの' };
-
+  const APP_VERSION = '2026-10-12.5';
+  const MIN_PHOTOS = 2, MAX_PHOTOS = 4, MAX_FILE_MB = 40, MAX_EDGE = 1600, PHOTO_TTL_MS = 24 * 3600 * 1000;
+  const SKEY = 'yokohama-sodai:v5';
+  const L$ = window.SodaiLogic, G = window.SodaiGrokGuide;
   const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const yen = n => n.toLocaleString('ja-JP') + '円';
-  const norm = s => (s || '').normalize('NFKC').toLowerCase()
-    .replace(/[\u30a1-\u30f6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60)).replace(/[\s・･:：()（）]/g, '');
+  const yen = L$.yen;
+  const nk = s => String(s ?? '').normalize('NFKC');
+  const telHref = n => 'tel:' + String(n).replace(/[^\d]/g, '');
+  const POPULAR = ['たんす', 'ソファー(2人以上用)', 'ベッド(枠のみ)', '自転車(子供用自転車を含む)', '布団&マットレス(2枚まで1組に)', '食器棚', 'テーブル', 'いす', 'カーペット類', '電子レンジ'];
+  const POP_LABEL = { 'ソファー(2人以上用)': 'ソファー', 'ベッド(枠のみ)': 'ベッド', '自転車(子供用自転車を含む)': '自転車', '布団&マットレス(2枚まで1組に)': '布団', 'カーペット類': 'カーペット' };
 
-  // 品目を検索しないときに先頭に出す、よく出される品目（公式品目一覧に存在する名称）
-  const POPULAR = ['たんす', 'ソファー(2人以上用)', 'ソファー(1人用)', 'ベッド(枠のみ)', 'ベッドマットレス(スプリング無し)', 'ベッドマットレス(スプリング付き)', '布団&マットレス(2枚まで1組に)', '自転車(子供用自転車を含む)', '食器棚', 'テーブル', 'いす', '書棚', 'カラーボックス', '机(両袖机以外)', '学習机(両袖机以外)', '座卓', 'こたつ(天板含む)', '衣装ケース(2段以上)', 'カーペット類', '電子レンジ', '扇風機', 'ストーブ類', '掃除機', '炊飯器', 'ベビーカー', 'チャイルドシート', 'スーツケース'];
-  const state = { photos: [], fees: null, rules: null, groups: [], group: null, material: null, notInList: false, dims: null, method: 'collect', category: null, aiDims: null, aiMaterial: null, grokReply: '' };
+  // 永続化する入力（写真以外）
+  const S = { screen: 'home', route: 'name', q: '', groupKey: null, naKey: null, notInList: false, longest: '', dims: { d: '', w: '', h: '' }, mat: null, variantMat: null, bat: null, batDamaged: false, bkind: null, bDamaged: false, count: 1, method: 'collect', carry: null, grokReply: '', wiz: 1, candidates: null, keepPhotos: false };
+  const D = { fees: null, rules: null, groups: [], fromCache: false, photos: [] };
 
-  // ---------- 初期化 ----------
+  // ---------- データ読み込み（形が正しいものだけ使う） ----------
+  async function loadJSON(url, valid) {
+    let fromCache = false;
+    try {
+      const res = await fetch(url, { cache: 'no-cache' });
+      fromCache = res.headers.get('x-sodai-cache') === '1';
+      if (res.ok) { const j = await res.json(); if (valid(j)) return { data: j, fromCache }; }
+    } catch { /* 下で保存済みを探す */ }
+    if (window.caches) {
+      const hit = await caches.match(url, { ignoreSearch: true });
+      if (hit) { try { const j = await hit.json(); if (valid(j)) return { data: j, fromCache: true }; } catch { /* 無効 */ } }
+    }
+    throw new Error(url + ' を読み込めませんでした');
+  }
+
   async function init() {
-    $('#minPhotosLabel').textContent = MIN_PHOTOS;
-    try {
-      const [f, r] = await Promise.all([fetch('data/fees.json').then(x => x.json()), fetch('data/rules.json').then(x => x.json())]);
-      state.fees = f; state.rules = r;
-      $('#dataDate').textContent = f.retrievedAt;
-      buildGroups();
-      renderCategories(); renderResults(); renderNA();
-    } catch (e) {
-      $('#recogBox').textContent = 'データの読み込みに失敗しました：' + e.message;
-      console.error(e);
-    }
-    setupGrok();
-    bind();
+    const saved = readSaved(); // 他の処理が保存し直す前に読む
     $('#appVersion').textContent = APP_VERSION;
-    setupSW();
-    history.replaceState({ step: 1 }, '');
-    window.addEventListener('popstate', e => go(clampStep((e.state && e.state.step) || 1), false));
-  }
-
-  function buildGroups() {
-    const map = new Map();
-    for (const it of state.fees.items) {
-      if (!map.has(it.baseName)) map.set(it.baseName, { baseName: it.baseName, category: it.category, items: [], keywords: new Set(), notAccepted: it.notAccepted });
-      const g = map.get(it.baseName);
-      g.items.push(it); it.keywords.forEach(k => g.keywords.add(k));
-    }
-    state.groups = [...map.values()].map(g => {
-      g.keywords = [...g.keywords];
-      g.materials = [...new Set(g.items.map(i => i.material).filter(Boolean))];
-      const fees = g.items.map(i => i.feeYen).filter(v => v != null);
-      g.minFee = Math.min(...fees); g.maxFee = Math.max(...fees);
-      g.search = norm([g.baseName, ...g.keywords, ...g.items.map(i => i.name)].join('|'));
-      return g;
-    }).sort((a, b) => a.baseName.localeCompare(b.baseName, 'ja'));
-  }
-
-  // ---------- STEP 制御 ----------
-  function clampStep(n) {
-    if (n >= 2 && state.photos.length < MIN_PHOTOS) return 1;
-    if (n >= 3 && !(state.group || state.notInList)) return 2;
-    if (n >= 4 && !state.dims) return 3;
-    return n;
-  }
-  function go(n, push = true) {
-    if (push && history.state?.step !== n) history.pushState({ step: n }, '');
-    if (n === 2 && !state.recognized) { state.recognized = true; runRecognizer(); }
-    document.querySelectorAll('.step').forEach(s => s.hidden = s.id !== 'step' + n);
-    document.querySelectorAll('.stepper li').forEach(li => {
-      const k = +li.dataset.step; li.classList.toggle('active', k === n); li.classList.toggle('done', k < n);
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function bind() {
-    $('#cameraInput').addEventListener('change', e => { addPhotos(e.target.files); e.target.value = ''; });
-    $('#galleryInput').addEventListener('change', e => { addPhotos(e.target.files); e.target.value = ''; });
-    const toStep2 = () => { if (state.photos.length >= MIN_PHOTOS) { state.recognized = false; go(2); } };
-    $('#toStep2').addEventListener('click', toStep2);
-    $('#toStep2b').addEventListener('click', toStep2);
-    $('#grokJump a').addEventListener('click', e => { e.preventDefault(); $('#grokSection').scrollIntoView({ behavior: 'smooth' }); });
-    document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => { if (history.state?.step > 1) history.back(); else go(+b.dataset.back); }));
-    $('#searchInput').addEventListener('input', renderResults);
-    $('#notInList').addEventListener('click', () => selectGroup(null, true));
-    $('#toStep3').addEventListener('click', () => { prepStep3(); go(3); });
-    $('#dimForm').addEventListener('submit', e => { e.preventDefault(); if (validateDims(true)) { renderResult(); go(4); } });
-    ['#dimD', '#dimW', '#dimH'].forEach(id => $(id).addEventListener('input', () => validateDims(false)));
-    $('#restart').addEventListener('click', restart);
-  }
-
-  // ---------- 写真 ----------
-  function addPhotos(fileList) {
-    for (const f of fileList) {
-      const isImg = f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name);
-      if (!isImg) { setPhotoStatus('画像ファイルを選んでください。', 'ng'); continue; }
-      if (f.size > MAX_FILE_MB * 1024 * 1024) { setPhotoStatus(`${MAX_FILE_MB}MBを超える写真は使えません。`, 'ng'); continue; }
-      if (state.photos.length >= MAX_PHOTOS) { setPhotoStatus(`写真は最大${MAX_PHOTOS}枚までです。`, 'ng'); break; }
-      state.photos.push({ file: f, url: URL.createObjectURL(f), id: Math.random().toString(36).slice(2) });
-    }
-    renderThumbs();
-  }
-  function removePhoto(id) {
-    const i = state.photos.findIndex(p => p.id === id);
-    if (i >= 0) { URL.revokeObjectURL(state.photos[i].url); state.photos.splice(i, 1); }
-    renderThumbs();
-  }
-  function setPhotoStatus(t, cls) { const el = $('#photoStatus'); el.textContent = t; el.className = 'status ' + (cls || ''); }
-  function renderThumbs() {
-    const box = $('#thumbs');
-    box.innerHTML = state.photos.map((p, i) => `<div class="thumb"><img src="${p.url}" alt="写真${i + 1}"><span class="no">${i + 1}</span><button class="del" data-id="${p.id}" aria-label="写真${i + 1}を削除">×</button></div>`).join('');
-    box.querySelectorAll('img').forEach(img => img.addEventListener('error', () => { img.replaceWith(Object.assign(document.createElement('span'), { className: 'noprev', textContent: 'プレビュー不可（HEIC等）' })); }, { once: true }));
-    box.querySelectorAll('.del').forEach(b => b.addEventListener('click', () => removePhoto(b.dataset.id)));
-    const n = state.photos.length, ok = n >= MIN_PHOTOS;
-    $('#toStep2').disabled = !ok;
-    $('#grokSection').hidden = !ok;
-    $('#grokJump').hidden = !ok;
-    updateShare();
-    setPhotoStatus(n === 0 ? '' : ok ? `${n}枚の写真があります。次へ進めます。` : `あと${MIN_PHOTOS - n}枚撮影してください（最低${MIN_PHOTOS}枚）。`, ok ? 'ok' : 'ng');
-  }
-
-  // ---------- 認識（プラグイン） ----------
-  async function runRecognizer() {
-    const box = $('#recogBox'), chips = $('#aiCandidates');
-    box.textContent = '写真を解析中…'; chips.innerHTML = '';
+    $$('.maxPhotos').forEach(e => e.textContent = MAX_PHOTOS);
     try {
-      const catalog = { groups: state.groups.map(g => ({ baseName: g.baseName, category: g.category, materials: g.materials, keywords: g.keywords })), notAccepted: state.rules.notAccepted };
-      const out = await window.SodaiRecognizer.recognize(state.photos.map(p => p.file), catalog, { grokReply: state.grokReply }) || {};
-      state.aiMaterial = out.material || null;
-      showNaHint(out.notAcceptedHint);
-      if (!out.candidates?.length && out.parsed?.itemName && !$('#searchInput').value) { $('#searchInput').value = out.parsed.itemName; renderResults(); }
-      const cands = (out.candidates || []).filter(c => state.groups.some(g => g.baseName === c.baseName)).slice(0, 5);
-      state.aiDims = out.estimatedDims || null;
-      box.textContent = out.message || (cands.length ? 'Grokの回答から見つけた公式品目の候補です。正しいものをタップして確定してください（AIの推定は間違うことがあります）。' : 'Grokの回答に合う公式品目が見つかりませんでした。検索・一覧から選んでください。');
-      chips.innerHTML = cands.map(c => `<button class="chip ai" data-b="${esc(c.baseName)}">${esc(c.baseName)}${c.confidence != null ? ` ${Math.round(c.confidence * 100)}%` : ''}</button>`).join('');
-      chips.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
-        const c = cands.find(x => x.baseName === b.dataset.b);
-        selectGroup(state.groups.find(g => g.baseName === b.dataset.b), false, c && c.material);
-      }));
+      const [f, r] = await Promise.all([loadJSON('data/fees.json', L$.validFees), loadJSON('data/rules.json', L$.validRules)]);
+      D.fees = f.data; D.rules = r.data; D.fromCache = f.fromCache || r.fromCache;
+      D.groups = L$.buildGroups(D.fees);
     } catch (e) {
-      console.error(e); box.textContent = '自動判定でエラーが発生しました。検索から選んでください。';
+      $('#main').insertAdjacentHTML('afterbegin', `<div class="card warn">データを読み込めませんでした。通信状態を確認して再読み込みしてください。<br>${esc(e.message)}</div>`);
+      return;
     }
+    $('#dataDate').textContent = D.fees.retrievedAt;
+    $('#itemCount').textContent = D.fees.items.length;
+    renderNotices(); renderPopular(); renderNA(); setupGrok(); bind(); setupSW();
+    purgeOldPhotos();
+    if (saved && saved.screen && saved.screen !== 'home') { $('#resumeBar').hidden = false; $('#resumeBtn').onclick = () => resume(saved); $('#freshBtn').onclick = () => { clearSaved(); $('#resumeBar').hidden = true; }; }
+    history.replaceState({ screen: 'home', idx: 0 }, '');
+    show('home', false);
+    window.addEventListener('popstate', e => show(clamp((e.state && e.state.screen) || 'home'), false));
   }
 
-  // ---------- 品目検索 ----------
-  function renderCategories() {
-    const cats = [...new Set(state.groups.map(g => g.category).filter(Boolean))];
-    $('#categoryChips').innerHTML = ['すべて', ...cats].map(c => `<button class="chip${(c === 'すべて' && !state.category) || c === state.category ? ' on' : ''}" data-c="${esc(c)}">${esc(c)}</button>`).join('');
-    $('#categoryChips').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { state.category = b.dataset.c === 'すべて' ? null : b.dataset.c; renderCategories(); renderResults(); }));
+  // ---------- 保存・再開 ----------
+  function save() { try { sessionStorage.setItem(SKEY, JSON.stringify({ ...S, savedAt: Date.now() })); } catch { /* 容量など */ } }
+  function readSaved() { try { return JSON.parse(sessionStorage.getItem(SKEY) || 'null'); } catch { return null; } }
+  function clearSaved() { try { sessionStorage.removeItem(SKEY); } catch { /* */ } }
+  async function resume(saved) {
+    Object.assign(S, saved, { dims: { ...S.dims, ...(saved.dims || {}) } });
+    $('#resumeBar').hidden = true;
+    $('#keepPhotos').checked = !!S.keepPhotos;
+    if (S.keepPhotos) await restorePhotos();
+    $('#q').value = S.q || ''; $('#longest').value = S.longest || '';
+    $('#dimD').value = S.dims.d || ''; $('#dimW').value = S.dims.w || ''; $('#dimH').value = S.dims.h || '';
+    $('#grokReply').value = S.grokReply || '';
+    if (S.grokReply) parseGrok(true);
+    renderThumbs(); renderResults();
+    const target = clamp(S.screen);
+    if (target !== 'home') history.pushState({ screen: target, idx: 1 }, '');
+    show(target, false);
+    toast('前回の続きから再開しました');
+  }
+
+  // ---------- 画面遷移 ----------
+  const group = () => S.naKey ? naGroup(S.naKey) : (S.groupKey ? D.groups.find(g => g.baseName === S.groupKey) : null);
+  function clamp(sc) {
+    const g = group();
+    if (['size', 'result', 'battery'].includes(sc) && !g && !S.notInList) return S.route === 'photo' ? 'photo' : 'item';
+    if (sc === 'battery' && !(g && g.isBattery)) return 'item';
+    if (sc === 'result' && !(g && g.notAccepted) && !(lengthCm() > 0)) return 'size';
+    return sc;
+  }
+  function go(sc) {
+    sc = clamp(sc);
+    const idx = (history.state && history.state.idx || 0) + 1;
+    history.pushState({ screen: sc, idx }, '');
+    show(sc, true);
+  }
+  function back() { if (history.state && history.state.idx > 0) history.back(); else show('home', true); }
+  function show(sc, focus) {
+    S.screen = sc; save();
+    $$('.screen').forEach(s => s.hidden = s.id !== 's-' + sc);
+    if (sc === 'item') renderResults();
+    if (sc === 'size') prepSize();
+    if (sc === 'result') renderResult();
+    if (sc === 'battery') renderBattery();
+    renderStepInd();
+    $('#notices').hidden = !['home', 'result', 'battery'].includes(sc);
+    window.scrollTo(0, 0);
+    if (focus !== false) { const h = $(`#s-${sc} h2`); if (h) h.focus({ preventScroll: true }); }
+  }
+  function renderStepInd() {
+    const seq = S.route === 'photo' ? ['photo', 'item', 'size', 'result'] : ['item', 'size', 'result'];
+    const names = { photo: '写真', item: '品目', size: '大きさ', result: '結果' };
+    const sc = S.screen === 'battery' ? 'size' : S.screen === 'home' ? (S.route === 'photo' ? 'photo' : 'item') : S.screen;
+    const i = seq.indexOf(sc);
+    const el = $('#stepInd');
+    if (S.screen === 'home' || i < 0) { el.hidden = true; return; }
+    el.hidden = false;
+    el.textContent = `全${seq.length}手順の${'①②③④'[i]} ${names[sc]}`;
+  }
+
+  // ---------- お知らせ ----------
+  function renderNotices() {
+    const list = L$.activeNotices(D.rules, new Date());
+    let h = list.map(n => `<div class="notice ${n.level === 'warn' ? 'warn' : ''}" role="note"><p>${esc(n.text)}</p><a href="${esc(n.url)}" target="_blank" rel="noopener">横浜市の案内を見る ↗</a></div>`).join('');
+    if (D.fromCache || !navigator.onLine) h += `<div class="notice warn" role="note"><p>オフラインまたは通信エラーのため、この端末に保存済みのデータ（取得日 ${esc(D.fees.retrievedAt)}）で表示しています。</p></div>`;
+    $('#notices').innerHTML = h;
+  }
+
+  // ---------- ホーム・検索 ----------
+  function renderPopular() {
+    $('#popular').innerHTML = POPULAR.filter(b => D.groups.some(g => g.baseName === b)).map(b => `<button type="button" class="chip" data-g="${esc(b)}">${esc(POP_LABEL[b] || b)}</button>`).join('');
+    $$('#popular .chip').forEach(b => b.addEventListener('click', () => { S.route = 'name'; selectGroup(b.dataset.g); }));
   }
   function feeText(g) {
-    if (g.notAccepted) return '<span class="fee na">受付不可</span>';
+    if (g.notAccepted) return '<span class="fee na">市で回収不可</span>';
+    if (g.minFee == null) return '';
     return `<span class="fee">${g.minFee === g.maxFee ? yen(g.minFee) : yen(g.minFee) + '〜' + yen(g.maxFee)}</span>`;
   }
+  function itemBtn(g, attr) {
+    return `<button type="button" class="row" role="listitem" ${attr}><span class="nm">${esc(g.baseName)}${g.keywords.length ? `<span class="kw">${esc(g.keywords.slice(0, 3).join('、'))}</span>` : ''}</span>${feeText(g)}</button>`;
+  }
   function renderResults() {
-    const q = norm($('#searchInput').value);
-    let list = state.groups.filter(g => !g.notAccepted && (!state.category || g.category === state.category));
-    if (!q) { const rank = g => { const i = POPULAR.indexOf(g.baseName); return i < 0 ? 999 : i; }; list = [...list].sort((a, b) => rank(a) - rank(b)); }
-    if (q) {
-      list = state.groups.filter(g => g.search.includes(q));
-      list.sort((a, b) => (norm(a.baseName).startsWith(q) ? 0 : 1) - (norm(b.baseName).startsWith(q) ? 0 : 1));
+    const q = $('#q').value.trim();
+    S.q = q;
+    let list = q ? L$.search(D.groups, q) : POPULAR.map(b => D.groups.find(g => g.baseName === b)).filter(Boolean);
+    const box = $('#results'), MAX = 60;
+    box.innerHTML = list.slice(0, MAX).map(g => itemBtn(g, `data-g="${esc(g.baseName)}"`)).join('');
+    $$('#results .row').forEach(b => b.addEventListener('click', () => selectGroup(b.dataset.g)));
+    $('#resultCount').textContent = q ? (list.length ? `「${q}」の候補 ${list.length}件${list.length > MAX ? `（上位${MAX}件を表示）` : ''}` : '') : 'よく出される物（名前を入力すると全品目から探します）';
+    const nh = $('#noHit');
+    nh.hidden = !(q && !list.length);
+    if (!nh.hidden) {
+      const rc = D.rules.reception;
+      nh.innerHTML = `<p><b>「${esc(q)}」は見つかりませんでした。</b>別の言い方（例：ソファ→ソファー）でも探してみてください。わからない時は電話で確認できます。</p>
+        <a class="btn primary big wide" href="${telHref(rc.phoneLandline)}">📞 粗大ごみ受付センター ${esc(rc.phoneLandline)}</a>
+        <a class="btn wide" href="${telHref(rc.phoneMobileIp)}">📱 携帯・IP電話から ${esc(rc.phoneMobileIp)}</a>
+        <p class="hint">${esc(rc.phoneHours)}</p>`;
     }
-    const ul = $('#results');
-    ul.innerHTML = list.slice(0, 80).map(g => `<li data-b="${esc(g.baseName)}"${state.group === g ? ' class="sel"' : ''}><span class="nm">${esc(g.baseName)}<span class="kw">${esc(g.keywords.slice(0, 4).join('、'))}</span></span>${feeText(g)}</li>`).join('')
-      + (list.length > 80 ? `<li class="kw">他${list.length - 80}件。キーワードで絞り込んでください。</li>` : '')
-      + (list.length === 0 ? '<li>該当なし。「一覧に見つからない」を押してください。</li>' : '');
-    ul.querySelectorAll('li[data-b]').forEach(li => li.addEventListener('click', () => selectGroup(state.groups.find(g => g.baseName === li.dataset.b))));
+    save();
+  }
+  function naGroup(key) {
+    const n = D.rules.notAccepted.find(x => x.key === key); if (!n) return null;
+    return { baseName: n.label, notAccepted: true, items: [], materials: [], keywords: [], naRule: n, isBattery: !!n.battery };
   }
   function renderNA() {
-    const ul = $('#naList');
-    ul.innerHTML = state.rules.notAccepted.map((n, i) => `<li data-i="${i}"><span class="nm">${esc(n.label)}</span><span class="fee na">受付不可</span></li>`).join('');
-    ul.querySelectorAll('li').forEach(li => li.addEventListener('click', () => {
-      const n = state.rules.notAccepted[+li.dataset.i];
-      state.group = { baseName: n.label, notAccepted: true, items: [], materials: [], naRule: n };
-      state.notInList = false; state.material = null;
-      afterSelect();
-    }));
+    $('#naList').innerHTML = D.rules.notAccepted.map(n => `<button type="button" class="row" role="listitem" data-na="${esc(n.key)}"><span class="nm">${esc(n.label)}</span><span class="fee na">市で回収不可</span></button>`).join('');
+    $$('#naList .row').forEach(b => b.addEventListener('click', () => selectNA(b.dataset.na)));
+  }
+  function resetInputs() {
+    Object.assign(S, { mat: null, variantMat: null, bat: null, batDamaged: false, count: 1, carry: null, bkind: null, bDamaged: false });
+  }
+  function selectGroup(baseName) {
+    const g = D.groups.find(x => x.baseName === baseName); if (!g) return;
+    if (S.groupKey !== baseName) resetInputs();
+    S.groupKey = baseName; S.naKey = null; S.notInList = false;
+    if (g.notAccepted) {
+      const rule = D.rules.notAccepted.find(n => n.match.some(m => g.baseName.includes(m)));
+      if (rule && rule.battery) { S.naKey = rule.key; S.groupKey = null; return go('battery'); }
+      return go('result'); // 収集対象外：寸法は聞かずに案内へ
+    }
+    go('size');
+  }
+  function selectNA(key) {
+    resetInputs(); S.naKey = key; S.groupKey = null; S.notInList = false;
+    go(naGroup(key).isBattery ? 'battery' : 'result');
   }
 
-  function selectGroup(g, notInList = false, suggestedMat = null) {
-    state.group = g; state.notInList = notInList; state.material = null;
-    if (g && g.materials.length === 1) state.material = g.materials[0];
-    suggestedMat = suggestedMat || state.aiMaterial;
-    if (g && suggestedMat && g.materials.includes(suggestedMat)) state.material = suggestedMat;
-    afterSelect();
+  // ---------- 大きさ ----------
+  function lengthCm() { return G.parseLengthCm(S.longest); }
+  function prepSize() {
+    const g = group();
+    $('#sizeItem').innerHTML = S.notInList ? '品目：<b>一覧にない物</b>' : `品目：<b>${esc(g.baseName)}</b>`;
+    $('#itemNotes').innerHTML = g ? notesHtml(g) : '';
+    $('#longest').value = S.longest; $('#dimD').value = S.dims.d; $('#dimW').value = S.dims.w; $('#dimH').value = S.dims.h;
+    $$('input[name=mat]').forEach(r => r.checked = r.value === S.mat);
+    $$('input[name=bat]').forEach(r => r.checked = r.value === S.bat);
+    $('#batDamaged').checked = !!S.batDamaged;
+    $('#batQ').hidden = !(g && g.batteryNote);
+    updateSizeUI(false);
   }
-  function afterSelect() {
-    const g = state.group, box = $('#materialBox'), sel = $('#selectedItem');
-    renderResults();
-    if (state.notInList) {
-      box.hidden = true; sel.hidden = false;
-      sel.innerHTML = '品目：<b>一覧にない物</b>（サイズと素材から粗大ごみに当たるかを判定し、電話での申込み方法を案内します）';
-    } else if (g) {
-      sel.hidden = false;
-      sel.innerHTML = `品目：<b>${esc(g.baseName)}</b>${g.notAccepted ? '（市では回収できません）' : ''}`;
-      if (!g.notAccepted && g.materials.length > 1) {
-        box.hidden = false;
-        $('#materialOptions').innerHTML = g.materials.map(m => { const lb = [...new Set(g.items.filter(i => i.material === m).map(i => i.materialLabel).filter(Boolean))].join('・'); return `<label><input type="radio" name="mat" value="${m}"${state.material === m ? ' checked' : ''}> ${esc(lb ? lb + '（' + MAT_LABEL[m] + '）' : MAT_LABEL[m])}</label>`; }).join('');
-        $('#materialOptions').querySelectorAll('input').forEach(r => r.addEventListener('change', () => { state.material = r.value; updateNext2(); }));
-      } else box.hidden = true;
-    }
-    updateNext2();
-    if (window.innerWidth < 700) sel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  function notesHtml(g) {
+    const notes = [...new Set(g.items.map(i => i.note).filter(Boolean))];
+    if (!notes.length) return '';
+    return `<div class="notes"><p class="lead">品目一覧の注意書き</p>${notes.map(n => `<p>${esc(n)}</p>`).join('')}</div>`;
   }
-  function updateNext2() {
-    const g = state.group;
-    $('#toStep3').disabled = !(state.notInList || (g && (g.notAccepted || g.materials.length <= 1 || state.material)));
+  function readSize() {
+    S.longest = $('#longest').value.trim();
+    S.dims = { d: $('#dimD').value.trim(), w: $('#dimW').value.trim(), h: $('#dimH').value.trim() };
+    S.mat = ($('input[name=mat]:checked') || {}).value || null;
+    S.bat = ($('input[name=bat]:checked') || {}).value || null;
+    S.batDamaged = $('#batDamaged').checked;
+    const v = ($('input[name=variant]:checked') || {}).value; S.variantMat = v || null;
   }
+  function dimsCm() { const p = G.parseLengthCm; return { d: p(S.dims.d), w: p(S.dims.w), h: p(S.dims.h) }; }
+  function updateSizeUI(strict) {
+    readSize();
+    const g = group(), L = lengthCm(), errs = [];
+    const info = $('#longestInfo');
+    if (S.longest && L == null) errs.push('一番長い辺は数字で入力してください（例：120、1.2m）');
+    else if (L != null && (L <= 0 || L > 1000)) errs.push('一番長い辺は0より大きく1000cm以下で入力してください');
+    else if (L != null && /[a-zA-Zａ-ｚ]|ミリ|メートル/.test(S.longest)) info.textContent = `＝ ${L}cm として計算します`;
+    else if (strict && L == null) errs.push('一番長い辺を入力してください');
+    const dd = dimsCm(), dv = [dd.d, dd.w, dd.h];
+    if ([S.dims.d, S.dims.w, S.dims.h].some((s, i) => s && dv[i] == null)) errs.push('縦・横・高さは数字で入力してください');
+    else if (L > 0 && dv.some(v => v != null && v > L)) errs.push('縦・横・高さのどれかが「一番長い辺」より長くなっています。測り直してください');
+    const ok = L > 0 && L <= 1000;
+    const ask = ok && L$.needsMaterialQuestion(S.notInList ? null : g, L, D.rules, S.mat === 'unknown' ? null : S.mat);
+    $('#matQ').hidden = !(ok && (ask || S.mat) && L >= D.rules.definition.metalThresholdCm && L < D.rules.definition.nonMetalThresholdCm && (S.notInList || L$.thresholdClass(g, null) === 'ask'));
+    if (strict && !$('#matQ').hidden && !S.mat) errs.push('主な素材を選んでください');
+    // 区分（素材違いで品目名が分かれる場合）
+    renderVariantQ(g, ok ? L : null);
+    if (strict && !$('#batQ').hidden && !S.bat) errs.push('バッテリーについて選んでください');
+    // 境界の近く
+    const near = ok ? L$.nearBoundaries(L, S.notInList ? null : g, D.rules, L$.thresholdClass(S.notInList ? null : g, S.mat)) : [];
+    const nw = $('#nearWarn'); nw.hidden = !near.length;
+    if (near.length) nw.textContent = `⚠ ${L}cmは基準（${near.map(t => t + 'cm').join('・')}）に近いため、結果が変わることがあります。もう一度測り直してください。`;
+    $('#sizeError').textContent = strict ? errs.join(' / ') : errs.filter(e => !/入力してください$|選んでください$/.test(e)).join(' / ');
+    save();
+    return errs.length === 0 && ok;
+  }
+  function renderVariantQ(g, L) {
+    const box = $('#varQ');
+    if (!g || S.notInList || L == null) { box.hidden = true; return; }
+    const r = L$.determine({ group: g, L, materialAns: S.mat === 'unknown' ? null : S.mat, battery: batteryInput() }, D.rules);
+    const cands = r.type === 'sodai' && !r.variant && !r.forcedMetal ? r.cands : (r.type === 'sodai' && r.forcedMetal && r.cands.length > 1 ? r.cands : null);
+    if (!cands || cands.length < 2) { box.hidden = true; return; }
+    box.hidden = false;
+    const opts = cands.map(c => `<label class="opt"><input type="radio" name="variant" value="${esc(c.materialLabel || c.material)}"${S.variantMat === (c.materialLabel || c.material) ? ' checked' : ''}> ${esc(nk(c.officialName))}（${yen(c.feeYen)}）</label>`).join('');
+    $('#varOpts').innerHTML = `<p class="hint">素材によって品目名が分かれています。${r.feeSame ? '手数料はどれも同じです。わからなければ選ばなくても進めます（申込み時に選びます）。' : '手数料が違うので、わかる場合は選んでください。'}</p>` + opts;
+    $$('#varOpts input').forEach(i => i.addEventListener('change', () => { readSize(); save(); }));
+  }
+  function batteryInput() { return S.bat ? { has: S.bat !== 'none', removable: S.bat === 'removable', damaged: !!S.batDamaged } : null; }
 
-  // ---------- サイズ ----------
-  function prepStep3() {
-    $('#unknownMaterialBox').hidden = !(state.notInList || (state.group && !state.group.notAccepted && state.group.materials.length === 0));
-    const ids = [['#dimD', 'd'], ['#dimW', 'w'], ['#dimH', 'h']];
-    if (state.aiDims && ids.every(([id]) => !$(id).value)) {
-      ids.forEach(([id, k]) => { if (state.aiDims[k] != null) { $(id).value = state.aiDims[k]; $(id).classList.add('prefilled'); } });
-      $('#dimConfirmBox').hidden = false; $('#dimConfirm').checked = false;
-      $('#dimInfo').textContent = 'Grokの推定値を仮入力しました（黄色の欄）。写真からの推定は誤差が大きいので、実測して修正してください。';
-    }
-    if (!state.aiMaterial && !$('#unknownMaterialBox').hidden) {} else if (state.aiMaterial) { const r = document.querySelector(`input[name=umat][value=${state.aiMaterial}]`); if (r && !document.querySelector('input[name=umat]:checked')) r.checked = true; }
-    validateDims(false);
+  // ---------- 判定結果 ----------
+  function src(urls) { return `<p class="src">出典：${[].concat(urls).filter(Boolean).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`).join('<br>')}</p>`; }
+  function phoneBlock(big) {
+    const rc = D.rules.reception;
+    return `<div class="phone">
+      <a class="btn ${big ? 'primary big' : ''} wide" href="${telHref(rc.phoneLandline)}">📞 ${esc(rc.phoneLandline)}（粗大ごみ受付センター）</a>
+      <a class="btn wide" href="${telHref(rc.phoneMobileIp)}">📱 ${esc(rc.phoneMobileIp)}（携帯・IP電話から）</a>
+      <button type="button" class="btn ghost wide" data-copy="${esc(rc.phoneLandline + ' / ' + rc.phoneMobileIp)}">番号をコピー</button>
+      <p class="hint">受付時間：${esc(rc.phoneHours)}</p></div>`;
   }
-  function validateDims(strict) {
-    const ids = { d: '#dimD', w: '#dimW', h: '#dimH' }, names = { d: '縦', w: '横', h: '高さ' }, vals = {}, errs = [];
-    for (const k in ids) {
-      const el = $(ids[k]), raw = el.value.trim(), v = Number(raw);
-      let bad = false;
-      if (raw === '') { if (strict) { errs.push(`${names[k]}を入力してください`); bad = true; } }
-      else if (!isFinite(v) || v <= 0) { errs.push(`${names[k]}は0より大きい数値で入力してください`); bad = true; }
-      else if (v > MAX_DIM_CM) { errs.push(`${names[k]}が大きすぎます（${MAX_DIM_CM}cm以下）`); bad = true; }
-      el.classList.toggle('invalid', bad);
-      vals[k] = v;
-    }
-    if (strict && !$('#unknownMaterialBox').hidden && !document.querySelector('input[name=umat]:checked')) errs.push('主な素材を選んでください');
-    if (strict && !$('#dimConfirmBox').hidden && !$('#dimConfirm').checked) errs.push('Grokの推定値を確認したらチェックを入れてください');
-    $('#dimError').textContent = errs.join(' / ');
-    const all = ['d', 'w', 'h'].every(k => $(ids[k]).value.trim() !== '' && vals[k] > 0 && vals[k] <= MAX_DIM_CM);
-    if (all) { state.dims = vals; if ($('#dimConfirmBox').hidden) $('#dimInfo').textContent = `一番長い辺：${Math.max(vals.d, vals.w, vals.h)}cm`; }
-    return errs.length === 0 && all;
+  function dataLine() { return `<p class="hint">データ取得日：${esc(D.fees.retrievedAt)}（横浜市の品目一覧）。${D.fromCache || !navigator.onLine ? '<b>オフラインのため保存済みデータで表示中。</b>' : ''}</p>`; }
+  function finalCheck(name) {
+    const rc = D.rules.reception;
+    return `<div class="final"><a class="btn wide" href="${esc(rc.itemListUrl)}" target="_blank" rel="noopener" data-copyname="${esc(name)}">公式品目一覧で最終確認 ↗</a><p class="hint">タップすると品目名「${esc(name)}」をコピーしてから開きます。検索欄に貼り付けてください。</p>${dataLine()}</div>`;
   }
-
-  // ---------- 判定 ----------
-  function sizeOk(it, L) {
-    const c = it.sizeCondition; if (!c) return true;
-    if (c.longestLtCm != null) return L < c.longestLtCm;
-    if (c.longestGteCm != null) return L >= c.longestGteCm;
-    return true;
-  }
-  function determine() {
-    const R = state.rules, g = state.group, d = state.dims, L = Math.max(d.d, d.w, d.h);
-    if (g && g.notAccepted) {
-      const rule = g.naRule || R.notAccepted.find(n => n.match.some(m => g.baseName.includes(m)));
-      const item = g.items && g.items[0];
-      return { type: 'na', L, rule, item };
-    }
-    let mat = state.material;
-    if (!mat && !$('#unknownMaterialBox').hidden) mat = (document.querySelector('input[name=umat]:checked') || {}).value;
-    const metal = mat === 'metal';
-    const th = metal ? R.definition.metalThresholdCm : R.definition.nonMetalThresholdCm;
-    const isSodai = L >= th;
-    let variant = null, variants = [];
-    if (g) {
-      variants = g.items.filter(i => !mat || !i.material || i.material === mat);
-      variant = variants.find(i => sizeOk(i, L)) || null;
-    }
-    return { type: isSodai ? 'yes' : 'no', L, th, mat, metal, variant, variants };
-  }
-
-  function photosStrip() { return `<div class="mini-photos">${state.photos.map((p, i) => `<img src="${p.url}" alt="写真${i + 1}">`).join('')}</div>`; }
-  function src(urls) { return `<p class="src">出典：${[].concat(urls).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`).join('<br>')}</p>`; }
-  function dimsLine(L) { const d = state.dims; return `縦${d.d}×横${d.w}×高さ${d.h}cm（一番長い辺 ${L}cm）`; }
+  function verdict(cls, title, body) { return `<div class="verdict ${cls}"><p class="big">${title}</p>${body || ''}</div>`; }
 
   function renderResult() {
-    const r = determine(), R = state.rules, rc = R.reception, g = state.group;
-    let h = photosStrip();
-    if (r.type === 'na') {
-      const rule = r.rule;
-      h += `<div class="verdict na"><p class="big">✕ 粗大ごみとして出せません</p><p>${esc(g.baseName)} は横浜市では回収できない品目です。</p></div>`;
-      if (rule) h += `<h3>処分方法</h3><p>${esc(rule.guidance)}</p><div class="linkbtns"><a class="btn" href="${esc(rule.url)}" target="_blank" rel="noopener">公式ページで詳しく見る</a></div>${src(rule.url)}`;
-      else if (r.item) h += `<p>${esc(r.item.note)}</p>${r.item.links.map(u => `<a class="btn" href="${esc(u)}" target="_blank" rel="noopener">詳しく見る</a>`).join('')}`;
-      h += `<p class="hint">不明な点は粗大ごみ受付センター（<a href="tel:${rc.phoneLandline.replace(/-/g, '')}">${rc.phoneLandline}</a> / 携帯 <a href="tel:${rc.phoneMobileIp.replace(/-/g, '')}">${rc.phoneMobileIp}</a>）へ。</p>`;
-      $('#resultBox').innerHTML = h; return;
+    const g = group(), R = D.rules, box = $('#resultBox');
+    let h = '';
+    if (g && g.notAccepted) { box.innerHTML = naHtml(g); wireResult(); return; }
+    const L = lengthCm();
+    const r = L$.determine({ group: S.notInList ? null : g, notInList: S.notInList, L, materialAns: S.mat === 'unknown' ? null : S.mat, variantMaterial: S.variantMat, battery: batteryInput() }, R);
+    const nearW = r.near && r.near.length ? `<div class="warn">⚠ 一番長い辺 ${L}cm は基準（${r.near.map(t => t + 'cm').join('・')}）に近いため、測り直してください。</div>` : '';
+    const notes = g && !S.notInList ? notesHtml(g) : '';
+    if (r.type === 'ask-material' || (S.mat === 'unknown' && L >= R.definition.metalThresholdCm && L < R.definition.nonMetalThresholdCm && (S.notInList || L$.thresholdClass(g, null) === 'ask'))) {
+      h += verdict('unk', 'このアプリでは確定できません', `<p>一番長い辺が${L}cmの場合、金属製品なら粗大ごみ、それ以外なら家庭ごみです。素材がわからない時は電話で確認してください。</p>`) + phoneBlock(true) + notes;
+    } else if (r.type === 'unknown') {
+      h += verdict('unk', 'このアプリでは確定できません。電話で確認してください', `<p>品目一覧にない物は、粗大ごみかどうか・手数料をこのアプリでは判断できません（品目一覧にない物はネットでは申し込めず、電話で受け付けています）。</p><p class="hint">参考：横浜市の基準では、一番長い辺が金属製品で30cm以上、それ以外で50cm以上が粗大ごみです（入力：${L}cm）。</p>`) + nearW + phoneBlock(true);
+    } else if (r.type === 'small') {
+      h += verdict('no', '粗大ごみではない可能性が高いです', `<p>一番長い辺 ${L}cm。横浜市の基準（${r.cls === 'metal' ? '金属製品は30cm以上' : 'それ以外は50cm以上'}）より小さいため、家庭ごみ・資源物として分別して出します。</p>`) + nearW + notes + batteryHtml(g, r, false)
+        + `<div class="linkbtns"><a class="btn primary big wide" href="${esc(R.smallItemGuide.url)}" target="_blank" rel="noopener">ごみの分け方を調べる（横浜市）↗</a></div>`
+        + `<details class="more"><summary>迷ったら電話で確認</summary>${phoneBlock(false)}</details>` + src([R.definition.source, R.smallItemGuide.url]);
+    } else if (r.type === 'phone') {
+      h += verdict('unk', 'このアプリでは確定できません。電話で確認してください', `<p>${esc(r.reason)}。</p>`) + nearW + notes + phoneBlock(true);
+    } else if (r.type === 'sodai') {
+      h += sodaiHtml(g, r, L, nearW, notes);
     }
-    const matTxt = r.mat ? MAT_LABEL[r.mat] : '不明';
-    if (r.type === 'no') {
-      h += `<div class="verdict no"><p class="big">粗大ごみに該当しない可能性が高いです</p><p>${dimsLine(r.L)}／素材：${esc(matTxt)}<br>横浜市の基準：一番長い辺が<b>${r.metal ? '金属製品で30cm以上' : '金属以外で50cm以上'}</b>が粗大ごみ。</p></div>
-        <p>${esc(R.smallItemGuide.text)} 分別区分は公式の分別検索で確認してください。</p>
-        <div class="linkbtns"><a class="btn primary" href="${R.smallItemGuide.url}" target="_blank" rel="noopener">ごみの分別を調べる（横浜市）</a></div>
-        <p class="hint">※サイズは目安です。品目によって扱いが異なる場合があります。迷ったら粗大ごみ受付センターへ（<a href="tel:0570200530">0570-200-530</a> / 携帯 <a href="tel:0453303953">045-330-3953</a>）。</p>
-        ${src([R.definition.source, R.smallItemGuide.url])}`;
-      $('#resultBox').innerHTML = h; return;
-    }
-    // 粗大ごみ
+    if (r.type !== 'sodai') h += finalCheck(g ? g.baseName : '') + src(D.fees.source.url);
+    box.innerHTML = h; wireResult(r);
+  }
+
+  function naHtml(g) {
+    const rule = g.naRule || D.rules.notAccepted.find(n => n.match.some(m => g.baseName.includes(m)));
+    const item = g.items && g.items[0];
+    let h = verdict('na', '✕ 粗大ごみとして出せません', `<p>「${esc(g.baseName)}」は横浜市では粗大ごみとして回収できません。</p>`);
+    if (item && item.note) h += `<div class="notes"><p class="lead">品目一覧の注意書き</p><p>${esc(item.note.replace(/\s*こちら$/, ''))}</p></div>`;
+    if (rule) h += `<h3>処分方法</h3><p>${esc(rule.guidance)}</p><a class="btn primary big wide" href="${esc(rule.url)}" target="_blank" rel="noopener">処分方法を公式ページで見る ↗</a>${src(rule.url)}`;
+    else if (item) h += item.links.map(u => `<a class="btn primary wide" href="${esc(u)}" target="_blank" rel="noopener">処分方法を公式ページで見る ↗</a>`).join('') + src(item.links);
+    h += `<details class="more"><summary>わからない時は電話で確認</summary>${phoneBlock(false)}</details>` + finalCheck(g.baseName);
+    return h;
+  }
+
+  function batteryHtml(g, r, sodai) {
+    if (!g || !g.batteryNote) return '';
+    const B = D.rules.battery, b = batteryInput();
+    let t;
+    if (!b || !b.has) t = 'バッテリーが付いている場合は、出し方が変わります。';
+    else if (b.removable) t = (b.damaged ? B.damaged : 'バッテリーは外して、家庭ごみの「電池類」へ出します。' + B.small);
+    else t = sodai ? (b.damaged ? 'バッテリーが破損・膨張している場合は、申し込む前に粗大ごみ受付センターへ相談してください。' : '本体の材質に関わらず「資）」の品目で申し込み、バッテリーは付けたまま出します。') : (b.damaged ? B.damaged : B.builtInSmall);
+    return `<div class="notes bat"><p class="lead">🔋 バッテリー</p><p>${esc(t)}</p>${src(B.sources[0])}</div>`;
+  }
+
+  function sodaiHtml(g, r, L, nearW, notes) {
+    const R = D.rules, rc = R.reception;
     const v = r.variant;
-    h += `<div class="verdict yes"><p class="big">◯ 粗大ごみです</p><p>${dimsLine(r.L)}／素材：${esc(matTxt)}<br>（基準：${r.metal ? '金属製品は一番長い辺30cm以上' : '金属以外は一番長い辺50cm以上'}）</p>`;
-    if (v) {
-      h += `<p class="fee-big">${yen(v.feeYen)}</p><dl class="kv"><dt>公式品目名</dt><dd>${esc(v.officialName)}</dd>${v.sizeCondition ? `<dt>サイズ区分</dt><dd>${v.sizeCondition.longestLtCm ? '長辺' + v.sizeCondition.longestLtCm + 'cm未満' : '長辺' + v.sizeCondition.longestGteCm + 'cm以上'}（入力サイズで自動選択）</dd>` : ''}<dt>手数料</dt><dd>1点あたり。収集・持込み同額</dd></dl>${v.note ? `<p class="hint">注意：${esc(v.note)}</p>` : ''}`;
-    } else if (g && r.variants.length) {
-      h += `<p>候補の手数料：${r.variants.map(i => esc(i.officialName) + ' ' + yen(i.feeYen)).join(' / ')}</p>`;
-    } else {
-      h += `<p><b>手数料は粗大ごみ受付センターへの電話で確認</b>してください（品目一覧にない物はネット申込み不可・電話申込み）。</p>`;
-    }
-    h += `</div>`;
-    if (v) h += lineBox();
-    h += `<div class="tabs" role="tablist"><button data-m="collect" class="${state.method === 'collect' ? 'on' : ''}">自宅前で収集</button><button data-m="self" class="${state.method === 'self' ? 'on' : ''}">自分で持込み</button></div><div id="procBox"></div>`;
-    h += `<p class="hint">※手数料は${state.fees.retrievedAt}時点の公式品目一覧に基づきます。申込み時に表示される金額が正です。</p>${src(state.fees.source.url)}`;
-    $('#resultBox').innerHTML = h;
-    $('#resultBox').querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { state.method = b.dataset.m; renderResult(); }));
-    $('#procBox').innerHTML = state.method === 'collect' ? procCollect(v, !g) : procSelf(v, !g);
-    if (v) setupLine(v, r);
-  }
-
-  // ---------- LINE申込み（横浜市公式アカウント） ----------
-  function lineBox() {
-    const rc = state.rules.reception;
-    return `<div class="line-box">
-      <a id="lineBtn" class="btn line wide" href="${esc(rc.lineAddFriendUrl)}" target="_blank" rel="noopener">LINEで申し込む（横浜市公式）</a>
-      <label class="qty">個数 <input id="lineQty" type="number" min="1" max="9" value="${state.qty || 1}" inputmode="numeric"> 点（収集は1回9個まで）</label>
-      <p class="hint">タップすると申し込みメモをコピーしてから、横浜市LINE公式アカウント（${esc(rc.lineId)}）を開きます。友だち追加後、トーク画面下のメニュー「粗大ごみ」から申し込めます。LINE（チャット）で収集を申し込むと、手数料を<b>クレジットカード・PayPay</b>で払えます。</p>
-      <pre id="lineMemo" class="memo" hidden></pre>
-      <p class="src">LINE公式アカウント：<a href="${esc(rc.lineSource)}" target="_blank" rel="noopener">${esc(rc.lineSource)}</a><br>LINE申込み：<a href="${esc(rc.lineInfoUrl)}" target="_blank" rel="noopener">${esc(rc.lineInfoUrl)}</a></p>
+    const base = v || r.cands[0];
+    const fee = L$.computeFee(base, S.count);
+    const feeUncertain = !v && !r.feeSame;
+    const self = S.method === 'self';
+    const limit = self ? R.selfDelivery.maxItemsPerDay : R.collection.maxItems;
+    let h = verdict('yes', '◯ 粗大ごみです', `<p>一番長い辺 ${L}cm（基準：${r.cls === 'metal' ? '金属製品は30cm以上' : 'それ以外は50cm以上'}）</p>`) + nearW;
+    if (r.battery && r.battery.has && !r.battery.removable && r.battery.damaged) h += `<div class="warn">🔋 バッテリーが破損・膨張しているため、申し込む前に粗大ごみ受付センターへ相談してください。</div>`;
+    h += `<div class="feebox">
+      <p class="lead">手数料の目安</p>
+      ${feeUncertain ? `<p>素材によって ${r.cands.map(c => esc(nk(c.officialName)) + ' ' + yen(c.feeYen)).join(' / ')}。前の画面で区分を選ぶと計算できます。</p>` : `
+      <p class="fee-big">${yen(fee.totalYen)}<small>（目安）</small></p>
+      <p>${esc(fee.formula)}</p>
+      <p class="hint">${yen(fee.unitYen)}は${esc(fee.unitLabel)}。${fee.condition ? esc(fee.condition) + '。' : ''}収集・持込みとも同じ手数料です。</p>`}
+      <label class="qty" for="count">数</label>
+      <div class="stepper-in"><button type="button" class="btn" data-cnt="-1" aria-label="1つ減らす">－</button><input id="count" type="number" inputmode="numeric" min="1" max="99" value="${fee.count}" aria-describedby="countUnit"><span id="countUnit">${esc(fee.unit)}</span><button type="button" class="btn" data-cnt="1" aria-label="1つ増やす">＋</button></div>
+      ${fee.sets > limit ? `<div class="warn">${self ? `持込みは1日${limit}個まで（栄ストックヤードの簡易申込みは${R.selfDelivery.sakaeSimpleMaxItems}個まで）` : `収集は1回の申込みで${limit}個まで`}です。分けて申し込んでください。</div>` : ''}
+      <p class="hint">${v ? '品目一覧の品目名：<b>' + esc(nk(v.officialName)) + '</b>' : '申込み時に区分（' + r.cands.map(c => esc(nk(c.officialName))).join(' / ') + '）を選びます'}</p>
+      <p class="hint"><b>シール（または電子決済）は、申し込みで金額が確定してから</b>支払ってください。表示は${esc(D.fees.retrievedAt)}時点の目安です。</p>
     </div>`;
-  }
-  function buildMemo(v, r, qty) {
-    const d = state.dims, g = state.group;
-    const total = v.feeYen * qty;
-    return [
-      '【横浜市 粗大ごみ 申し込みメモ】',
-      `品目：${g ? g.baseName : ''}（公式品目名：${v.officialName}）`,
-      `素材：${r.mat ? MAT_LABEL[r.mat] : '不明'}`,
-      `サイズ：縦${d.d}×横${d.w}×高さ${d.h}cm（一番長い辺 ${r.L}cm）`,
-      `個数：${qty}点`,
-      `手数料：${yen(v.feeYen)} × ${qty}点 = ${yen(total)}（${state.fees.retrievedAt}時点の公式品目一覧。申込み時の表示が正）`,
-      '支払い：LINE・チャット・ネットで「収集」を申し込むと、クレジットカード／PayPayで電子決済可（本受付完了メールの決済URLから収集日の3営業日前まで）。',
-      '　または「粗大ごみ収集シール」を市内のコンビニ・郵便局・指定金融機関で購入（領収書は収集終了まで保管）。',
-      '　※持込み（自己搬入）は事前にシールを購入（栄ストックヤードの簡易申込みは電子決済対応）。',
-      '出し方：収集日当日の朝8時までに、申込み時に確認した場所へ。シールまたは受付番号6桁・収集日を書いた紙を貼る。'
-    ].join('\n');
-  }
-  async function copyText(text) {
-    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch { /* fallback */ }
-    const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
-    let ok = false; try { ok = document.execCommand('copy'); } catch { ok = false; } ta.remove(); return ok;
-  }
-  function toast(msg, ng) {
-    let t = $('#toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
-    t.textContent = msg; t.className = 'toast show' + (ng ? ' ng' : '');
-    clearTimeout(toast._t); toast._t = setTimeout(() => { t.className = 'toast'; }, 4500);
-  }
-  function setupLine(v, r) {
-    const btn = $('#lineBtn'), qtyEl = $('#lineQty'), memoEl = $('#lineMemo');
-    const qty = () => { const n = Math.round(Number(qtyEl.value)); return n >= 1 && n <= 9 ? n : 1; };
-    qtyEl.addEventListener('change', () => { state.qty = qty(); qtyEl.value = state.qty; if (!memoEl.hidden) memoEl.textContent = buildMemo(v, r, state.qty); });
-    btn.addEventListener('click', () => {
-      // リンク遷移（新しいタブ）はブラウザ既定動作に任せ、同じタップでメモをコピー
-      state.qty = qty();
-      const memo = buildMemo(v, r, state.qty);
-      memoEl.textContent = memo; memoEl.hidden = false;
-      copyText(memo).then(ok => toast(ok ? '申し込みメモをコピーしました。LINEの「粗大ごみ」メニューから申し込んでください' : 'コピーできませんでした。画面の申し込みメモを見ながら申し込んでください', !ok));
-    });
+    h += notes + batteryHtml(g, r, true);
+    h += `<div class="tabs" role="group" aria-label="出し方"><button type="button" data-m="collect" aria-pressed="${!self}">自宅前などで収集</button><button type="button" data-m="self" aria-pressed="${self}">自分で持ち込む</button></div>`;
+    h += `<div class="apply"><p class="done-not">⚠ ここでは申し込みは完了していません。下のどれかで申し込んでください。</p>
+      <a class="btn primary big wide" href="${esc(rc.internetUrl)}" target="_blank" rel="noopener">インターネットで申し込む（24時間）↗</a>
+      <details class="more"><summary>ほかの方法（LINE・チャット・電話）</summary>
+        <a class="btn line wide" href="${esc(rc.lineAddFriendUrl)}" target="_blank" rel="noopener">横浜市のLINEを開く ↗</a>
+        <p class="hint">横浜市LINE公式アカウント（${esc(rc.lineId)}）のメニュー「粗大ごみ」から申し込めます。</p>
+        <a class="btn wide" href="${esc(rc.chatUrl)}" target="_blank" rel="noopener">チャットで申し込む ↗</a>
+        ${phoneBlock(false)}
+        ${src([rc.source, rc.lineSource, rc.lineInfoUrl])}
+      </details></div>`;
+    const memo = feeUncertain ? L$.buildMemo({ group: g, variant: null, cands: r.cands, fee: null, dims: dimsCm(), L, method: S.method, rules: R, retrievedAt: D.fees.retrievedAt })
+      : L$.buildMemo({ group: g, variant: v, cands: r.cands, fee, dims: dimsCm(), L, method: S.method, rules: R, retrievedAt: D.fees.retrievedAt });
+    h += `<div class="memo-box"><p class="lead">申し込みで聞かれること</p><pre id="memo" class="memo">${esc(memo)}</pre><button type="button" id="copyMemo" class="btn wide">📋 メモをコピー</button></div>`;
+    h += self ? procSelf(fee, feeUncertain) : procCollect(fee, feeUncertain);
+    h += `<div class="q carry"><p class="lead">自分で外まで運べますか？</p><div class="btnrow"><button type="button" class="btn" data-carry="yes" aria-pressed="${S.carry === 'yes'}">はい</button><button type="button" class="btn" data-carry="no" aria-pressed="${S.carry === 'no'}">いいえ・難しい</button></div><div id="supportBox">${S.carry === 'no' ? supportHtml() : ''}</div></div>`;
+    h += finalCheck(v ? nk(v.officialName).replace(/^[可資不][)）]/, '') : g.baseName) + src(D.fees.source.url);
+    return h;
   }
 
-  function applyStep(phoneOnly) {
-    const rc = state.rules.reception;
-    const tel = `<a class="btn" href="tel:${rc.phoneLandline.replace(/-/g, '')}">📞 ${rc.phoneLandline}（固定電話）</a><a class="btn" href="tel:${rc.phoneMobileIp.replace(/-/g, '')}">📱 ${rc.phoneMobileIp}（携帯・IP）</a>`;
-    if (phoneOnly) return `<li><b>粗大ごみ受付センターに電話で申し込む</b>品目一覧にない物は電話で申込み。${esc(rc.phoneHours)}。<div class="linkbtns">${tel}</div></li>`;
-    return `<li><b>粗大ごみ受付センターに申し込む</b>インターネット・チャット・LINEは24時間受付。電話は${esc(rc.phoneHours)}。
-      <div class="linkbtns"><a class="btn primary" href="${rc.internetUrl}" target="_blank" rel="noopener">インターネット受付</a><a class="btn" href="${rc.chatUrl}" target="_blank" rel="noopener">チャット受付</a><a class="btn" href="${rc.lineAddFriendUrl}" target="_blank" rel="noopener">LINE（横浜市公式）</a><a class="btn" href="${rc.lineInfoUrl}" target="_blank" rel="noopener">LINE受付について</a>${tel}</div>
-      <span class="hint">申込み時に「受付番号（6桁）」と収集日（搬入日）を控えてください。</span></li>`;
+  function supportHtml() {
+    const s = D.rules.support;
+    return `<div class="notes"><p><b>${esc(s.carryOut.title)}</b>：${esc(s.carryOut.text)}</p><p class="hint">${esc(s.carryOut.targetsSummary)}</p>
+      <a class="btn wide" href="${esc(s.carryOut.url)}" target="_blank" rel="noopener">持ち出し収集の条件を見る ↗</a>
+      <a class="btn wide" href="${esc(D.rules.reception.jimushoUrl)}" target="_blank" rel="noopener">区の資源循環局事務所の電話番号 ↗</a>
+      <p><b>${esc(s.exemption.title)}</b>：${esc(s.exemption.text)}</p>
+      <a class="btn wide" href="${esc(s.exemption.url)}" target="_blank" rel="noopener">減免の対象を見る ↗</a>
+      <p class="hint">利用できるかどうかは条件によります。このアプリでは判断できません。</p></div>`;
   }
-  function procCollect(v, phoneOnly) {
-    const R = state.rules, c = R.collection, p = R.payment;
-    return `<ol class="steps">
-      ${applyStep(phoneOnly)}
-      <li><b>締切・目安</b>収集日の7日前までに申込み（例：火曜収集なら前週の月曜まで）。受付から収集まで2週間程度。1回の申込みは${c.maxItems}個まで。</li>
-      <li><b>手数料を払う（どちらか）</b><ul class="sub">
-        <li><b class="inl">粗大ごみ収集シール</b>を市内の指定金融機関・郵便局・コンビニ（${p.convenienceStores.join('、')}）で${v ? yen(v.feeYen) + '分' : '手数料分'}購入。領収書は収集が終わるまで保管（領収日付印のないものは無効、シールの再発行不可）。</li>
-        <li><b class="inl">電子決済</b>（ネット・チャット・LINE申込みのみ）：クレジットカード／PayPay。本受付完了メールの決済URLから収集日の3営業日前までに。電話申込みでは不可。</li></ul></li>
-      <li><b>当日の出し方</b>シールの場合：受付番号6桁・収集日・氏名を記入し、見やすい所に貼る。電子決済の場合：10cm四方以上の紙に受付番号6桁と収集日を大きく書き、テープで4辺を貼る。<b>収集日当日の朝8時まで</b>に申込み時に確認した場所へ。雨でも収集（油性ペンで記入）。</li>
-      <li><b>注意</b>ストーブ・ガステーブルは灯油や電池を抜く。箱や袋から出し、一式がわかるようにまとめる。申込みなしで出すと不法投棄になります。</li>
+  function procCollect(fee, unc) {
+    const R = D.rules, c = R.collection, p = R.payment;
+    return `<h3>収集の流れ</h3><ol class="steps">
+      <li><b>申し込む</b>収集日の7日前まで（例：火曜収集なら前週の月曜まで）。受付から収集まで2週間程度。1回の申込みは${c.maxItems}個まで。家庭から出るものだけが対象です。受付番号（6桁）と収集日を控えます。</li>
+      <li><b>手数料を払う（金額が確定してから）</b>
+        <ul class="sub"><li>粗大ごみ収集シールを市内の指定金融機関・郵便局・コンビニ（${esc(p.convenienceStores.join('、'))}）で${!unc && fee ? yen(fee.totalYen) + '分' : '手数料分'}購入。領収書は収集が終わるまで保管。</li>
+        <li>電子決済（インターネット・チャット・LINEで申し込んだ場合のみ）：クレジットカード・PayPay。本受付完了メールの決済URLから収集日の3営業日前までに。電話申込みでは使えません。</li></ul></li>
+      <li><b>当日</b>シールの<b>氏名欄に受付番号（6桁）と収集日</b>を記入して貼り、<b>収集日の朝8時まで</b>に申込み時に確認した場所へ。電子決済の場合は縦横10cm以上の紙に受付番号6桁と収集日を書き、テープで4辺を貼ります。雨でも収集します（油性ペンで記入）。</li>
     </ol>${src([...c.sources, ...p.sources])}`;
   }
-  function procSelf(v, phoneOnly) {
-    const S = state.rules.selfDelivery, p = state.rules.payment;
-    return `<ol class="steps">
-      ${applyStep(phoneOnly)}
-      <li><b>締切</b>インターネット受付は搬入日当日15時まで。1日20個まで（栄ストックヤードの簡易申込みは10個まで）。</li>
-      <li><b>手数料を払う</b>収集と同じ手数料${v ? '（' + yen(v.feeYen) + '）' : ''}。粗大ごみ収集シールを指定金融機関・郵便局・コンビニで事前購入（ヤードではシール販売なし）。</li>
-      <li><b>持ち込む</b>シールを貼り、申し込んだ日時・施設へ。9時前は入場不可。原則本人が持込み（代理は委任状）、荷下ろしは自分で。免許証・車検証の確認がある場合あり。
-        <ul>${S.yards.map(y => `<li>${esc(y.name)}：${esc(y.address)}（${esc(y.hours)}／休：${esc(y.closed)}）<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(y.address)}" target="_blank" rel="noopener">地図</a></li>`).join('')}</ul></li>
-    </ol>${src(S.sources)}`;
+  function procSelf(fee, unc) {
+    const S2 = D.rules.selfDelivery;
+    return `<h3>持ち込みの流れ</h3><ol class="steps">
+      <li><b>申し込む</b>インターネット受付は搬入日当日15時まで。1日${S2.maxItemsPerDay}個まで（栄ストックヤードの簡易申込みは${S2.sakaeSimpleMaxItems}個まで）。家庭から出るものだけが対象です。</li>
+      <li><b>手数料を払う（金額が確定してから）</b>収集と同じ手数料${!unc && fee ? '（目安 ' + yen(fee.totalYen) + '）' : ''}。粗大ごみ収集シールを事前に購入（ヤードでは販売していません）。</li>
+      <li><b>持ち込む</b>申し込んだ日時・施設へ。9時より前は入場できません。原則申込者本人が持込み（本人以外は委任状）、荷下ろしは自分で。
+        <ul class="sub">${S2.yards.map(y => `<li>${esc(y.name)}：${esc(y.address)}（${esc(y.hours)}／休み：${esc(y.closed)}）</li>`).join('')}</ul></li>
+    </ol>${src(S2.sources)}`;
   }
 
-  // ---------- Service Worker（更新通知） ----------
-  function setupSW() {
-    if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
-    $('#reloadBtn').addEventListener('click', () => location.reload());
-    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
-      // 既に有効なSWがある状態で新しいSWが入った＝アプリ更新。初回インストール時は表示しない
-      reg.addEventListener('updatefound', () => {
-        const nw = reg.installing; if (!nw || !reg.active) return;
-        nw.addEventListener('statechange', () => { if (nw.state === 'activated') $('#updateBar').hidden = false; });
-      });
-      const check = () => reg.update().catch(() => {});
-      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
-      setInterval(check, 30 * 60 * 1000);
-    }).catch(() => {});
+  function wireResult() {
+    const box = $('#resultBox');
+    $$('[data-m]', box).forEach(b => b.addEventListener('click', () => { S.method = b.dataset.m; save(); renderResult(); }));
+    $$('[data-cnt]', box).forEach(b => b.addEventListener('click', () => { S.count = Math.min(99, Math.max(1, (Number(S.count) || 1) + Number(b.dataset.cnt))); save(); renderResult(); $('#count')?.focus(); }));
+    const cnt = $('#count', box);
+    if (cnt) cnt.addEventListener('change', () => { const n = Math.floor(Number(cnt.value)); S.count = n >= 1 && n <= 99 ? n : 1; save(); renderResult(); });
+    $$('[data-carry]', box).forEach(b => b.addEventListener('click', () => { S.carry = b.dataset.carry; save(); $$('[data-carry]', box).forEach(x => x.setAttribute('aria-pressed', x === b)); $('#supportBox').innerHTML = S.carry === 'no' ? supportHtml() : ''; }));
+    const cm = $('#copyMemo', box);
+    if (cm) cm.addEventListener('click', async () => { const ok = await copyText($('#memo').textContent); toast(ok ? 'メモをコピーしました' : 'コピーできませんでした。メモを長押しして選択してください', !ok); });
+    $$('[data-copy]', box).forEach(b => b.addEventListener('click', async () => { const ok = await copyText(b.dataset.copy); toast(ok ? '電話番号をコピーしました' : 'コピーできませんでした', !ok); }));
+    $$('[data-copyname]', box).forEach(a => a.addEventListener('click', () => { copyText(a.dataset.copyname).then(ok => toast(ok ? `「${a.dataset.copyname}」をコピーしました` : 'コピーできませんでした', !ok)); }));
   }
 
-  // ---------- Grokガイド ----------
-  const G = () => window.SodaiGrokGuide;
-  function setupGrok() {
-    if (!G()) return;
-    $('#grokPrompt').value = G().PROMPT;
-    const ua = navigator.userAgent || '';
-    const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-    const android = /Android/.test(ua);
-    const rec = ios ? '#storeIos' : android ? '#storeAndroid' : '#storeWeb';
-    $(rec).classList.add('rec');
-    if (ios || android) { const other = ios ? '#storeAndroid' : '#storeIos'; $(other).hidden = true; }
-    $('#copyPrompt').addEventListener('click', copyPrompt);
-    $('#sharePhotos').addEventListener('click', sharePhotos);
-    $('#saveCombined').addEventListener('click', e => { if ($('#saveCombined').getAttribute('aria-disabled') === 'true') e.preventDefault(); else setCopyStatus('まとめ画像を保存しました。Grokの＋ボタンからこの1枚を添付してください。', 'ok'); });
-    $('#pasteReply').addEventListener('click', async () => {
-      try { const t = await navigator.clipboard.readText(); if (t) { $('#grokReply').value = t; parseGrok(); } }
-      catch { setCopyStatus('貼り付けできませんでした。欄を長押しして「ペースト」してください。', 'ng'); $('#grokReply').focus(); }
-    });
-    $('#parseReply').addEventListener('click', parseGrok);
-    if (!navigator.clipboard?.readText) $('#pasteReply').hidden = true;
+  // ---------- バッテリー単体 ----------
+  function renderBattery() {
+    $$('input[name=bkind]').forEach(r => r.checked = r.value === S.bkind);
+    $('#bDamaged').checked = !!S.bDamaged;
+    const B = D.rules.battery, out = $('#batteryResult');
+    if (!S.bkind) { out.innerHTML = '<p class="hint">種類を選ぶと出し方を表示します。</p>'; return; }
+    let t, title;
+    if (S.bkind === 'car') { title = '市では収集できません'; t = B.car; }
+    else if (S.bDamaged) { title = '集積場所には出せません'; t = B.damaged; }
+    else if (S.bkind === 'small') { title = '家庭ごみの「電池類」で出せます'; t = B.small; }
+    else { title = 'このアプリでは確定できません'; t = B.sodaiSizeBattery; }
+    out.innerHTML = verdict(S.bkind === 'small' && !S.bDamaged ? 'no' : 'unk', esc(title), `<p>${esc(t)}</p>`)
+      + (S.bkind === 'big' ? phoneBlock(true) : '') + (S.bDamaged && S.bkind !== 'car' ? `<a class="btn wide" href="${esc(D.rules.reception.jimushoUrl)}" target="_blank" rel="noopener">区の資源循環局事務所 ↗</a>` : '')
+      + src(B.sources);
+    $$('[data-copy]', out).forEach(b => b.addEventListener('click', async () => { const ok = await copyText(b.dataset.copy); toast(ok ? '電話番号をコピーしました' : 'コピーできませんでした', !ok); }));
   }
-  function setCopyStatus(t, c) { const el = $('#copyStatus'); el.textContent = t; el.className = 'status ' + (c || ''); }
-  async function copyPrompt(silent) {
-    const text = G().PROMPT;
-    let ok = false;
-    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); ok = true; } } catch { ok = false; }
-    if (!ok) {
-      const ta = $('#grokPrompt'); ta.removeAttribute('readonly'); ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
-      try { ok = document.execCommand('copy'); } catch { ok = false; }
-      ta.setAttribute('readonly', ''); window.getSelection()?.removeAllRanges();
-    }
-    if (silent === true) return ok;
-    setCopyStatus(ok ? 'コピーしました。Grokの入力欄に貼り付けてください。' : 'コピーできませんでした。文章を長押しして選択・コピーしてください。', ok ? 'ok' : 'ng');
+
+  // ---------- 共通UI ----------
+  async function copyText(text) {
+    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch { /* 下へ */ }
+    const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch { ok = false; } ta.remove(); return ok;
   }
-  // ---------- まとめ画像（写真①②を横並び1枚に） ----------
-  const COMBINED_NAME = 'sodai-photos.jpg';
-  const COMBO = { H: 1024, GAP: 24, PAD: 16, MAX_W: 4096, MAX_BYTES: 2 * 1024 * 1024 };
-  let comboKey = '', comboPromise = null, comboUrl = null;
-  async function loadImage(file) {
-    if (window.createImageBitmap) {
-      try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch { /* fallback */ }
-    }
+  function toast(msg, ng) { const t = $('#toast'); t.textContent = msg; t.className = 'toast show' + (ng ? ' ng' : ''); clearTimeout(toast._t); toast._t = setTimeout(() => { t.className = 'toast'; }, 4000); }
+
+  function bind() {
+    $('#homeForm').addEventListener('submit', e => { e.preventDefault(); S.route = 'name'; $('#q').value = $('#homeQ').value; go('item'); });
+    $('#toPhoto').addEventListener('click', () => { S.route = 'photo'; go('photo'); });
+    $$('[data-gohome]').forEach(b => b.addEventListener('click', () => { go('item'); setTimeout(() => $('#q').focus(), 50); }));
+    $$('[data-back]').forEach(b => b.addEventListener('click', back));
+    $$('[data-restart]').forEach(b => b.addEventListener('click', restart));
+    let t; $('#q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(renderResults, 120); });
+    $('#notInList').addEventListener('click', () => { resetInputs(); S.groupKey = null; S.naKey = null; S.notInList = true; go('size'); });
+    $('#sizeForm').addEventListener('input', () => updateSizeUI(false));
+    $('#sizeForm').addEventListener('change', () => updateSizeUI(false));
+    $('#sizeForm').addEventListener('submit', e => { e.preventDefault(); if (updateSizeUI(true)) go('result'); else $('#sizeError').focus?.(); });
+    $('#s-battery').addEventListener('change', () => { S.bkind = ($('input[name=bkind]:checked') || {}).value || null; S.bDamaged = $('#bDamaged').checked; save(); renderBattery(); });
+    $('#cameraInput').addEventListener('change', e => { addPhotos(e.target.files); e.target.value = ''; });
+    $('#galleryInput').addEventListener('change', e => { addPhotos(e.target.files); e.target.value = ''; });
+    $('#keepPhotos').addEventListener('change', e => { S.keepPhotos = e.target.checked; save(); if (S.keepPhotos) storePhotos(); else clearStoredPhotos(); });
+    $('#feedbackLink').addEventListener('click', e => { if (e.currentTarget.getAttribute('aria-disabled') === 'true') e.preventDefault(); });
+  }
+
+  function restart() {
+    D.photos.forEach(p => URL.revokeObjectURL(p.url)); D.photos = [];
+    clearStoredPhotos();
+    Object.assign(S, { screen: 'home', route: 'name', q: '', groupKey: null, naKey: null, notInList: false, longest: '', dims: { d: '', w: '', h: '' }, grokReply: '', wiz: 1, candidates: null, keepPhotos: false });
+    resetInputs();
+    ['#homeQ', '#q', '#longest', '#dimD', '#dimW', '#dimH', '#grokReply'].forEach(id => $(id).value = '');
+    $('#keepPhotos').checked = false; $('#aiConsent').checked = false; $('#parsedBox').hidden = true; $('#cands').hidden = true;
+    renderThumbs(); setWiz(1); clearSaved();
+    history.replaceState({ screen: 'home', idx: 0 }, ''); show('home', true);
+  }
+
+  // ---------- 写真（早い段階で縮小・再エンコード＝位置情報などを除去） ----------
+  async function decode(file) {
+    if (window.createImageBitmap) { try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch { /* 下へ */ } }
     return await new Promise((res, rej) => {
       const url = URL.createObjectURL(file), img = new Image();
-      img.style.imageOrientation = 'from-image';
-      img.onload = () => { res(img); setTimeout(() => URL.revokeObjectURL(url), 0); };
-      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('画像を読み込めませんでした')); };
+      img.onload = () => { URL.revokeObjectURL(url); res(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('decode')); };
       img.src = url;
     });
   }
   const toBlob = (c, q) => new Promise(r => c.toBlob(r, 'image/jpeg', q));
-  async function composeCombined(files) {
-    const imgs = await Promise.all(files.slice(0, 2).map(loadImage));
-    const dims = imgs.map(i => [i.width || i.naturalWidth, i.height || i.naturalHeight]);
-    let H = COMBO.H;
-    const widthAt = h => dims.reduce((s, [w, hh]) => s + Math.round(w * h / hh), 0) + COMBO.GAP * (imgs.length - 1) + COMBO.PAD * 2;
-    if (widthAt(H) > COMBO.MAX_W) H = Math.floor(H * (COMBO.MAX_W - COMBO.PAD * 2 - COMBO.GAP) / (widthAt(H) - COMBO.PAD * 2 - COMBO.GAP));
-    let blob = null, canvas = null;
-    for (let scale = 1; scale >= 0.5; scale -= 0.25) {
-      const h = Math.round(H * scale);
-      canvas = document.createElement('canvas');
-      canvas.width = widthAt(h); canvas.height = h + COMBO.PAD * 2;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      let x = COMBO.PAD;
-      imgs.forEach((img, i) => {
-        const w = Math.round(dims[i][0] * h / dims[i][1]);
-        ctx.drawImage(img, x, COMBO.PAD, w, h);
-        const r = Math.max(22, Math.round(h * 0.045));
-        ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.beginPath(); ctx.arc(x + r + 10, COMBO.PAD + r + 10, r, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(r * 1.3)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(i === 0 ? '①' : '②', x + r + 10, COMBO.PAD + r + 12);
-        x += w + COMBO.GAP;
-      });
-      for (const q of [0.85, 0.75, 0.65]) { blob = await toBlob(canvas, q); if (blob && blob.size <= COMBO.MAX_BYTES) break; }
-      if (blob && blob.size <= COMBO.MAX_BYTES) break;
-    }
-    imgs.forEach(i => i.close && i.close());
-    if (!blob) throw new Error('画像の作成に失敗しました');
-    return { file: new File([blob], COMBINED_NAME, { type: 'image/jpeg' }), width: canvas.width, height: canvas.height };
+  async function reencode(file) {
+    const img = await decode(file);
+    const w0 = img.width || img.naturalWidth, h0 = img.height || img.naturalHeight;
+    const k = Math.min(1, MAX_EDGE / Math.max(w0, h0));
+    const c = document.createElement('canvas'); c.width = Math.round(w0 * k); c.height = Math.round(h0 * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    img.close && img.close();
+    const blob = await toBlob(c, 0.85);
+    c.width = c.height = 0;
+    if (!blob) throw new Error('encode');
+    return blob;
+  }
+  let adding = Promise.resolve();
+  function addPhotos(list) {
+    const files = [...list];
+    adding = adding.then(async () => {
+      for (const f of files) {
+        if (D.photos.length >= MAX_PHOTOS) { setPhotoStatus(`写真は${MIN_PHOTOS}〜${MAX_PHOTOS}枚です。これ以上は追加できません。`, 'ng'); break; }
+        if (!f.type.startsWith('image/')) { setPhotoStatus('画像ファイルを選んでください。', 'ng'); continue; }
+        if (f.size > MAX_FILE_MB * 1024 * 1024) { setPhotoStatus(`${MAX_FILE_MB}MBを超える写真は使えません。`, 'ng'); continue; }
+        setPhotoStatus('写真を準備中…');
+        try {
+          const blob = await reencode(f);
+          D.photos.push({ blob, url: URL.createObjectURL(blob), id: Math.random().toString(36).slice(2) });
+        } catch { setPhotoStatus('この写真は読み込めませんでした。別の写真を選ぶか、カメラで撮り直してください。', 'ng'); continue; }
+      }
+      renderThumbs(); if (S.keepPhotos) storePhotos();
+    });
+    return adding;
+  }
+  function removePhoto(id) {
+    const i = D.photos.findIndex(p => p.id === id);
+    if (i >= 0) { URL.revokeObjectURL(D.photos[i].url); D.photos.splice(i, 1); }
+    renderThumbs(); if (S.keepPhotos) storePhotos();
+  }
+  function setPhotoStatus(t, cls) { const el = $('#photoStatus'); el.textContent = t; el.className = 'status ' + (cls || ''); }
+  function renderThumbs() {
+    $('#thumbs').innerHTML = D.photos.map((p, i) => `<div class="thumb"><img src="${p.url}" alt="写真${i + 1}"><span class="no">${'①②③④'[i]}</span><button type="button" class="del" data-id="${p.id}" aria-label="写真${i + 1}を削除">×</button></div>`).join('');
+    $$('#thumbs .del').forEach(b => b.addEventListener('click', () => removePhoto(b.dataset.id)));
+    const n = D.photos.length, ok = n >= MIN_PHOTOS;
+    setPhotoStatus(n === 0 ? `同じ物を${MIN_PHOTOS}枚以上撮ってください（${MAX_PHOTOS}枚まで）。` : ok ? `${n}枚あります（${MAX_PHOTOS}枚まで）。` : `あと${MIN_PHOTOS - n}枚撮ってください（${MIN_PHOTOS}〜${MAX_PHOTOS}枚）。`, n === 0 ? '' : ok ? 'ok' : 'ng');
+    updatePrep();
+  }
+
+  // IndexedDB（同意した場合のみ・24時間で削除）
+  function idb() { return new Promise((res, rej) => { if (!window.indexedDB) return rej(new Error('no idb')); const r = indexedDB.open('yokohama-sodai', 1); r.onupgradeneeded = () => r.result.createObjectStore('photos'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+  async function idbDo(mode, fn) { const db = await idb(); return new Promise((res, rej) => { const tx = db.transaction('photos', mode); const st = tx.objectStore('photos'); const out = fn(st); tx.oncomplete = () => { db.close(); res(out && out.result); }; tx.onerror = () => { db.close(); rej(tx.error); }; }); }
+  function storePhotos() { idbDo('readwrite', st => st.put({ savedAt: Date.now(), blobs: D.photos.map(p => p.blob) }, 'current')).catch(() => {}); }
+  function clearStoredPhotos() { idbDo('readwrite', st => st.delete('current')).catch(() => {}); }
+  async function restorePhotos() {
+    try {
+      const v = await idbDo('readonly', st => st.get('current'));
+      if (!v || Date.now() - v.savedAt > PHOTO_TTL_MS) { clearStoredPhotos(); return; }
+      D.photos = v.blobs.map(blob => ({ blob, url: URL.createObjectURL(blob), id: Math.random().toString(36).slice(2) }));
+    } catch { /* 復元できない */ }
+  }
+  async function purgeOldPhotos() { try { const v = await idbDo('readonly', st => st.get('current')); if (v && Date.now() - v.savedAt > PHOTO_TTL_MS) clearStoredPhotos(); } catch { /* */ } }
+
+  // ---------- AI（任意） ----------
+  function setupGrok() {
+    $('#grokPrompt').value = G.PROMPT;
+    const P = D.rules.privacy;
+    $('#xaiPolicyText').textContent = P.summary;
+    $('#xaiPolicyLink').href = P.xaiPolicyUrl;
+    const ua = navigator.userAgent || '';
+    const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1), android = /Android/.test(ua);
+    if (ios) $('#storeAndroid').hidden = true; if (android) $('#storeIos').hidden = true;
+    $('#aiConsent').addEventListener('change', updatePrep);
+    $$('[data-wgo]').forEach(b => b.addEventListener('click', () => setWiz(+b.dataset.wgo, true)));
+    $('#copyPrompt').addEventListener('click', async () => { const ok = await copyText(G.PROMPT); setCopyStatus(ok ? 'コピーしました。AIの入力欄に貼り付けてください。' : 'コピーできませんでした。文章を長押しして選択・コピーしてください。', ok ? 'ok' : 'ng'); });
+    $('#sharePhotos').addEventListener('click', shareCombined);
+    $('#saveCombined').addEventListener('click', saveCombined);
+    $('#pasteReply').addEventListener('click', async () => { try { const t = await navigator.clipboard.readText(); if (t) { $('#grokReply').value = t; parseGrok(); } } catch { setCopyStatus('貼り付けできませんでした。欄を長押しして「ペースト」してください。', 'ng'); $('#grokReply').focus(); } });
+    if (!navigator.clipboard?.readText) $('#pasteReply').hidden = true;
+    $('#parseReply').addEventListener('click', () => parseGrok());
+    setWiz(S.wiz || 1);
+  }
+  function setWiz(n, focus) {
+    S.wiz = n; save();
+    $$('.wiz').forEach(w => w.hidden = +w.dataset.w !== n);
+    $$('.wiz-ind li').forEach(li => { const k = +li.dataset.w; li.classList.toggle('on', k === n); if (k === n) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current'); });
+    if (focus) $(`.wiz[data-w="${n}"] h3`)?.setAttribute('tabindex', '-1'), $(`.wiz[data-w="${n}"] h3`)?.focus();
+  }
+  function setCopyStatus(t, c) { const el = $('#copyStatus'); el.textContent = t; el.className = 'status ' + (c || ''); }
+  const COMBINED_NAME = 'sodai-photos.jpg';
+  let combo = { key: '', p: null, url: null };
+  async function composeCombined(blobs) {
+    const imgs = await Promise.all(blobs.map(decode));
+    const H = 900, GAP = 20, PAD = 14;
+    const ws = imgs.map(i => Math.round((i.width || i.naturalWidth) * H / (i.height || i.naturalHeight)));
+    const c = document.createElement('canvas'); c.width = ws.reduce((a, b) => a + b, 0) + GAP * (imgs.length - 1) + PAD * 2; c.height = H + PAD * 2;
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+    let px = PAD;
+    imgs.forEach((img, i) => { x.drawImage(img, px, PAD, ws[i], H); x.fillStyle = 'rgba(0,0,0,.65)'; x.beginPath(); x.arc(px + 44, PAD + 44, 34, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = 'bold 44px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('①②'[i], px + 44, PAD + 46); px += ws[i] + GAP; img.close && img.close(); });
+    let blob = null; for (const q of [0.85, 0.75, 0.6]) { blob = await toBlob(c, q); if (blob && blob.size < 2e6) break; }
+    const out = { file: new File([blob], COMBINED_NAME, { type: 'image/jpeg' }), width: c.width, height: c.height };
+    c.width = c.height = 0;
+    return out;
   }
   function getCombined() {
-    const key = state.photos.slice(0, 2).map(p => p.id).join('|');
-    if (key !== comboKey || !comboPromise) { comboKey = key; comboPromise = composeCombined(state.photos.slice(0, 2).map(p => p.file)); }
-    return comboPromise;
+    const key = D.photos.slice(0, 2).map(p => p.id).join('|');
+    if (key !== combo.key || !combo.p) { combo.key = key; combo.p = composeCombined(D.photos.slice(0, 2).map(p => p.blob)); }
+    return combo.p;
   }
-  function canShareFiles() {
-    try { return !!(navigator.canShare && navigator.canShare({ files: [new File([new Blob(['x'], { type: 'image/jpeg' })], COMBINED_NAME, { type: 'image/jpeg' })] })); } catch { return false; }
-  }
-  function updateShare() {
-    const ok = state.photos.length >= MIN_PHOTOS;
+  function canShareFiles() { try { return !!(navigator.canShare && navigator.canShare({ files: [new File([new Blob(['x'], { type: 'image/jpeg' })], COMBINED_NAME, { type: 'image/jpeg' })] })); } catch { return false; } }
+  function updatePrep() {
+    const ok = D.photos.length >= MIN_PHOTOS, consent = $('#aiConsent').checked;
+    $('#prepBox').hidden = !consent;
+    $('#w1next').disabled = !(consent && ok);
+    if (!consent) return;
     $('#sharePhotos').hidden = !(ok && canShareFiles());
-    const save = $('#saveCombined'), prev = $('#combinedPreview'), info = $('#combinedInfo');
-    save.setAttribute('aria-disabled', 'true'); save.removeAttribute('href');
-    if (!ok) { comboKey = ''; comboPromise = null; prev.hidden = true; return; }
-    info.textContent = 'まとめ画像を作成中…';
-    const key = state.photos.slice(0, 2).map(p => p.id).join('|');
+    $('#saveCombined').disabled = !ok;
+    $('#perPhoto').innerHTML = D.photos.map((p, i) => `<button type="button" class="btn" data-pp="${i}">写真${'①②③④'[i]}の保存画面を開きます</button>`).join('');
+    $$('#perPhoto [data-pp]').forEach(b => b.addEventListener('click', () => openSave(new File([D.photos[+b.dataset.pp].blob], `sodai-photo-${+b.dataset.pp + 1}.jpg`, { type: 'image/jpeg' }))));
+    const prev = $('#combinedPreview'), info = $('#combinedInfo');
+    if (!ok) { prev.hidden = true; info.textContent = `写真が${MIN_PHOTOS}枚以上になると、送る画像を作ります。`; return; }
+    info.textContent = '送る画像を作成中…';
+    const key = D.photos.slice(0, 2).map(p => p.id).join('|');
     getCombined().then(c => {
-      if (key !== comboKey) return;
-      if (comboUrl) URL.revokeObjectURL(comboUrl);
-      comboUrl = URL.createObjectURL(c.file);
-      prev.src = comboUrl; prev.hidden = false;
-      save.href = comboUrl; save.setAttribute('aria-disabled', 'false');
-      info.textContent = `写真①②を横に並べた1枚の画像です（${c.width}×${c.height}px・${Math.round(c.file.size / 1024)}KB）。3枚目以降は含みません。`;
-      state.combined = c;
-    }).catch(e => { console.warn(e); info.textContent = 'まとめ画像を作れませんでした。Grokに写真を1枚ずつ添付してください。'; });
+      if (key !== combo.key) return;
+      if (combo.url) URL.revokeObjectURL(combo.url);
+      combo.url = URL.createObjectURL(c.file); prev.src = combo.url; prev.hidden = false;
+      info.textContent = `写真①②を横に並べた1枚の画像です（Grokアプリは共有で1枚だけ受け取れるため）。位置情報などは含みません。`;
+    }).catch(() => { info.textContent = '画像を作れませんでした。「1枚ずつ送りたい場合」を使ってください。'; });
   }
-  async function sharePhotos() {
-    copyPrompt(true); // 共有先で貼り付けられるよう文章もコピー（待たない：共有のユーザー操作を保つため）
+  async function shareCombined() {
+    copyText(G.PROMPT);
     try {
       const c = await getCombined();
-      const data = { files: [c.file], text: G().PROMPT };
-      if (navigator.canShare && !navigator.canShare(data)) delete data.text;
-      if (!navigator.canShare || !navigator.canShare({ files: data.files })) throw Object.assign(new Error('unsupported'), { name: 'NotSupportedError' });
+      const data = { files: [c.file], text: G.PROMPT };
+      if (!navigator.canShare(data)) delete data.text;
       await navigator.share(data);
-      setCopyStatus('共有先でGrokを選び、文章も一緒に送ってください（文章はコピー済み）。', 'ok');
-    } catch (e) {
-      if (e.name === 'AbortError') return;
-      if (e.name === 'NotAllowedError') setCopyStatus('共有が開けませんでした。もう一度「写真を共有」をタップしてください。', 'ng');
-      else setCopyStatus('共有できませんでした。「まとめ画像を保存」してGrokで添付してください。', 'ng');
-    }
+      setCopyStatus('共有先でGrokを選び、文章も貼り付けて送ってください。', 'ok');
+    } catch (e) { if (e.name !== 'AbortError') setCopyStatus('共有できませんでした。「保存画面を開きます」を使ってください。', 'ng'); }
   }
-  function parseGrok() {
-    const text = $('#grokReply').value;
-    state.grokReply = text;
-    const p = G().parseReply(text), box = $('#parsedBox');
+  async function openSave(file) {
+    // iPhone等：共有シート（「画像を保存」を選べます）。それ以外：ダウンロード
+    if (canShareFiles()) { try { await navigator.share({ files: [file] }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+    const url = URL.createObjectURL(file), a = document.createElement('a'); a.href = url; a.download = file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+    setCopyStatus('ダウンロード画面を開きました。保存できたか確認してください。', '');
+  }
+  async function saveCombined() { try { openSave((await getCombined()).file); } catch { setCopyStatus('画像を作れませんでした。', 'ng'); } }
+  const HOW = { exact: '名称が一致', prefix: '名称が近い候補', contains: '名称が近い候補', keyword: '別名が近い候補' };
+  function parseGrok(silent) {
+    const text = $('#grokReply').value; S.grokReply = text; save();
+    const p = G.parseReply(text), box = $('#parsedBox');
     box.hidden = false;
-    if (!p.ok) { box.className = 'parsed ng'; box.textContent = '回答を読み取れませんでした。Grokの回答（「品目名：」で始まる部分）をそのままコピーして貼り付けてください。'; return; }
+    if (!p.ok) { box.className = 'parsed ng'; box.textContent = '回答を読み取れませんでした。「品目名：」で始まる部分をそのまま貼り付けてください。'; return; }
+    const catalog = { groups: D.groups, notAccepted: D.rules.notAccepted };
+    const cands = G.matchCandidates(p, catalog), na = G.naHint(p, catalog);
     box.className = 'parsed';
-    const d = p.dims, dim = k => d[k] != null ? d[k] + 'cm' : '—';
-    state.aiDims = (d.d || d.w || d.h) ? { d: d.d ?? null, w: d.w ?? null, h: d.h ?? null } : null;
-    state.aiMaterial = p.material;
-    box.innerHTML = `<b>読み取り結果（Grokの推定・未確定）</b><dl>
-      <dt>品目名</dt><dd>${esc(p.itemName || '—')}${p.aliases.length ? '（' + esc(p.aliases.join('、')) + '）' : ''}</dd>
-      <dt>主な素材</dt><dd>${esc(p.materialRaw || '—')}${p.material ? ' → ' + MAT_LABEL[p.material] : ''}</dd>
-      <dt>サイズ</dt><dd>縦${dim('d')}×横${dim('w')}×高さ${dim('h')}</dd>
-      <dt>回収対象外</dt><dd>${esc(p.notAcceptedRaw || '—')}</dd>
-      <dt>確信度</dt><dd>${esc(p.confidence || '—')}</dd></dl>
-      <span class="hint">「次へ」で公式品目の候補を表示します。品目と寸法は次の画面で確認・修正できます。</span>`;
-    ['#dimD', '#dimW', '#dimH'].forEach(id => { $(id).value = ''; $(id).classList.remove('prefilled'); });
-    if (p.itemName) $('#searchInput').value = '';
-  }
-  function showNaHint(h) {
-    $('#naHint')?.remove();
-    if (!h || !h.flagged) return;
-    const div = document.createElement('div'); div.id = 'naHint'; div.className = 'na-warn';
-    div.innerHTML = h.rule
-      ? `⚠ Grokは「${esc(h.rule.label)}」の可能性を挙げています。該当する場合、横浜市では粗大ごみとして出せません。<button type="button" class="btn" style="margin-top:6px;width:100%">回収できない物として確認する</button>`
-      : `⚠ Grokは回収対象外の可能性（${esc(h.raw)}）を挙げています。下の「市で回収できない物」も確認してください。`;
-    $('#recogBox').after(div);
-    const b = div.querySelector('button');
-    if (b) b.addEventListener('click', () => { state.group = { baseName: h.rule.label, notAccepted: true, items: [], materials: [], naRule: h.rule }; state.notInList = false; state.material = null; afterSelect(); });
+    box.innerHTML = `<p>AIの回答：<b>${esc(p.itemName)}</b>${p.aliases.length ? '（' + esc(p.aliases.join('、')) + '）' : ''}</p>`
+      + (na && na.rule ? `<div class="warn">AIは「${esc(na.rule.label)}」の可能性を挙げています。<button type="button" class="btn wide" data-na="${esc(na.rule.key)}">回収できない物として確認する</button></div>` : '')
+      + (cands.length ? `<p class="lead">名称が近い候補（タップで選ぶ）</p><div class="results" role="list">${cands.map(c => { const g = D.groups.find(x => x.baseName === c.baseName); return itemBtn(g, `data-g="${esc(c.baseName)}"`).replace('</span>', `<span class="kw">${HOW[c.how]}</span></span>`); }).join('')}</div>` : '<p>品目一覧に近い名前が見つかりませんでした。</p>')
+      + '<p class="hint">AIの答えは間違うことがあります。違うと思ったら名前で探してください。</p><button type="button" class="btn wide" data-gohome2>🔍 品目名で調べる</button>';
+    $$('[data-g]', box).forEach(b => b.addEventListener('click', () => selectGroup(b.dataset.g)));
+    $$('[data-na]', box).forEach(b => b.addEventListener('click', () => selectNA(b.dataset.na)));
+    $('[data-gohome2]', box).addEventListener('click', () => { $('#q').value = p.itemName; go('item'); });
+    if (!silent) box.focus?.();
   }
 
-  function restart() {
-    state.photos.forEach(p => URL.revokeObjectURL(p.url));
-    Object.assign(state, { photos: [], group: null, material: null, notInList: false, dims: null, method: 'collect', aiDims: null, aiMaterial: null, grokReply: '' });
-    $('#grokReply').value = ''; $('#parsedBox').hidden = true; $('#dimConfirmBox').hidden = true; $('#naHint')?.remove();
-    ['#dimD', '#dimW', '#dimH'].forEach(id => $(id).classList.remove('prefilled'));
-    ['#dimD', '#dimW', '#dimH', '#searchInput'].forEach(id => $(id).value = '');
-    document.querySelectorAll('input[name=umat]').forEach(r => r.checked = false);
-    $('#selectedItem').hidden = true; $('#materialBox').hidden = true; $('#dimInfo').textContent = ''; $('#dimError').textContent = '';
-    renderThumbs(); renderResults(); state.recognized = false; history.replaceState({ step: 1 }, ''); go(1, false);
+  // ---------- Service Worker（更新は確認してから） ----------
+  function setupSW() {
+    if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+    $('#reloadBtn').addEventListener('click', () => {
+      if (S.screen !== 'home' && !confirm('アプリを更新します。入力内容は残りますが、一時保存していない写真は消えます。更新しますか？')) return;
+      save(); location.reload();
+    });
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+      reg.addEventListener('updatefound', () => { const nw = reg.installing; if (!nw || !reg.active) return; nw.addEventListener('statechange', () => { if (nw.state === 'activated') $('#updateBar').hidden = false; }); });
+      const check = () => reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+      setInterval(check, 30 * 60 * 1000);
+    }).catch(() => {});
+    window.addEventListener('online', renderNotices); window.addEventListener('offline', renderNotices);
   }
 
-  // テスト用に公開
-  window.__sodai = { buildMemo, state, getCombined, canShareFiles, determine, addPhotos, selectGroup, go, validateDims, renderResult };
+  window.__sodai = { S, D, go, show, selectGroup, selectNA, addPhotos, getCombined, renderResult, parseGrok, setWiz, restart, version: APP_VERSION };
   document.addEventListener('DOMContentLoaded', init);
 })();

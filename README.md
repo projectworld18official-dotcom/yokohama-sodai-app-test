@@ -1,43 +1,51 @@
-# 横浜市 粗大ごみナビ（試作PWA）
+# 横浜市 粗大ごみナビ（非公式・試用版PWA）
 
-写真（2枚以上）→ 品目確定 → 縦・横・高さ（cm）入力 → 粗大ごみ判定・手数料・申込み〜当日の手順、までを案内する横浜市限定のモバイルWebアプリ試作版。
-素のHTML/CSS/JSのみ・ビルド不要。
+横浜市の粗大ごみについて「出せるか・手数料の目安・申し込み方法」を案内する非公式のモバイルWebアプリ。素のHTML/CSS/JSのみ・ビルド不要。**横浜市の公式アプリではありません。**
 
 ## 起動
-    cd yokohama-sodai-app && python3 -m http.server 8765
-    # スマホ実機でカメラを使うには HTTPS（または localhost）で配信してください
+    python3 -m http.server 8765   # このフォルダで実行
+    node tests/unit.test.js        # 単体テスト（パーサ・手数料・境界値・判定順・検索・お知らせ）
 
-## 構成
-- index.html / style.css / app.js … UI・判定ロジック
-- recognizer.js … **画像認識フック**（現状はプレースホルダー。差し替え方法はファイル冒頭コメント参照）
-- data/fees.json … 公式品目一覧（547品目, 取得日 2026-10-12, 出典URL付き）
-- data/rules.json … 定義・受付・支払・収集・持込み・回収不可品目のルール（各出典URL付き）
-- manifest.webmanifest / sw.js / icons/ … PWA
+## 流れ（v2026-10-12.5）
+1. ホーム：「品目名で調べる」＋よく出される物のボタン。名前がわからない時だけ「写真で調べる」（写真は任意、その場合は2〜4枚）
+2. 品目：検索（かな・カタカナ同一視、言い換え辞書、逆包含）。0件なら電話ボタン
+3. 判定順：①市で回収できない物（寸法を聞かず案内）→②品目一覧の注意書き・バッテリー等の例外→③サイズ基準（一番長い辺：金属製品30cm以上／それ以外50cm以上）
+   - 一番長い辺を最初に聞く。素材は30〜50cmで結論が変わる時だけ聞く。基準±5cmは「測り直して」警告
+   - 一覧にない物は断定しない（「このアプリでは確定できません。電話で確認」）。公式区分がない組み合わせも電話で確認
+4. 結果：手数料の「目安」（computeFee 1か所で計算し、結果・メモ・シール案内で共通使用）。「◯点まで1組」等は ceil(個数/組数)×単価
+   - 大きな推奨ボタン1つ（インターネット受付）＋「ほかの方法」（LINE・チャット・電話）
+   - 「申し込みで聞かれること」メモとコピー。「ここでは申し込みは完了していません」
+   - 収集/持込み切替で上限（9個／1日20個・栄10個）・支払い・メモが変わる
+   - 「自分で外まで運べますか？」→ 持ち出し収集・減免の案内（対象かどうかは判断しない）
+   - 「公式品目一覧で最終確認」（品目名をコピーしてから開く）＋データ取得日
 
-## 判定ロジック
-1. 回収不可品目（家電4品目・パソコン・バイク・消火器・ピアノ等）→ 受付不可＋処分先案内
-2. 一番長い辺 = max(縦,横,高さ)。主素材が金属なら30cm以上、それ以外は50cm以上で粗大ごみ（横浜市公式基準）
-3. 粗大ごみの場合、同じ品目・素材の中から「長辺1m未満/以上」「長辺80cm未満/以上」等のサイズ区分を寸法で自動選択し手数料を表示
-4. 一覧にない物 → 素材を質問し判定、電話申込みを案内
+## AI（任意）
+写真ルートの折りたたみ欄で ①送る準備（外部送信の注意と同意）→②Grokで質問→③回答を貼る。AIには**品目名の候補だけ**を聞き、寸法・素材は聞かない（自動入力もしない）。候補は「名称が近い候補」として表示（%表示なし）。写真は追加時にcanvasで縮小・再エンコードするため、位置情報などのEXIFは含まれない。
 
-## 写真からの品目特定（既定：Grokガイド方式・有料API不要）
-写真が2枚以上になると「Grokで写真を調べる」欄が表示されます（任意。使わずに一覧から手動で選んでもOK）。
-1. 「Grokとは？」の紹介、iPhone（App Store）/ Android（Google Play）/ ブラウザ（grok.com）への導線（端末をUAで判定して強調）
-2. 定型プロンプトをワンタップでコピー（navigator.clipboard、非対応時は execCommand('copy')）、grok.com を新しいタブで開く
-3. 写真①②をcanvasで横並び1枚のJPEG（sodai-photos.jpg、高さ約1024px、2MB以下）にまとめる。Web Share API対応端末は「写真を共有」でその1枚をGrokアプリへ（Grokアプリは共有で1枚しか受け付けないため）、ブラウザ利用者は「まとめ画像を保存」して添付
-4. Grokの回答を貼り付け →「回答を読み取る」で、品目名・素材・縦横高さ・回収対象外の可能性を解析（recognizer.js の SodaiGrokGuide.parseReply）
-5. 品目ステップで公式品目一覧の候補を提示、素材を事前選択、サイズ欄に推定値を仮入力（黄色）。推定値を使った場合は「確認しました」チェックが必須
-6. 判定・手数料は常に横浜市公式データ（data/fees.json, data/rules.json）で計算
+## プライバシー・保存
+- アプリ自体は写真を外部に送らない。AIへの送信は利用者自身の操作のみ
+- 入力内容（品目・寸法・手順・AIの回答）は sessionStorage。写真は同意した場合のみ IndexedDB に保存し24時間で削除
+- 「続きから再開」、入力途中の更新は確認ダイアログ
 
-無料プランで足りるよう、1回のメッセージ（まとめ画像1枚＋文章1つ）で完結する設計です。画像生成・DeepSearch等は使いません。
+## Service Worker
+- キャッシュ名は `yokohama-sodai-nav-<版>`。削除するのはこの接頭辞の古いキャッシュだけ
+- 失敗した応答（非200）は保存しない。data/*.json は形を検査し、壊れたデータで保存済みデータを上書きしない
+- オフラインで保存済みデータを使っている時は画面に表示
 
-### 自動認識に差し替える場合（任意）
-`window.SodaiRecognizer.recognize(files, catalog, { grokReply })` が同じ形
-（`{candidates:[{baseName, confidence, material}], material, estimatedDims:{d,w,h}, notAcceptedHint}`）を返せば、
-recognizer.js より後に読み込むスクリプトで差し替えられます。外部APIを使う場合もキーはブラウザに置かずサーバー側で扱ってください。
+## データ更新手順
+1. `python3 tools/update_fees.py fetch` … 公式品目一覧の内部データを取得（日本語セッション）→ tools/raw-dustlist.json
+2. `python3 tools/update_fees.py diff` … 手数料・名称・注記の変更、新規・削除品目を確認
+3. `python3 tools/update_fees.py apply YYYY-MM-DD` … 既存品目を更新し取得日を変更、まとめ数え等を再計算（新規・削除は内容を見て手作業）
+4. data/rules.json … 公式ページを確認して更新（schemaVersion 5 以上が必須）。期間限定のお知らせは `notices`（start/end を過ぎると自動で非表示）
+5. `node tests/unit.test.js` を通し、APP_VERSION（app.js）と VERSION（sw.js）を上げる
 
-## 注意
-本アプリは横浜市の公式アプリではありません。手数料・ルールは変更される可能性があり、申込み時の公式表示が正です。
+公式データは548件。うち1件（dustType 5「電子決済持込み用品目」code 646）は公式の品目一覧ページにも表示されない内部用のため除外し、547件を収録（テストで検証）。
 
-## LINE申込み
-粗大ごみ判定の結果画面に「LINEで申し込む（横浜市公式）」ボタン。タップで申し込みメモ（品目・公式品目名・素材・寸法・個数・手数料・支払い方法）をコピー＆画面表示し、横浜市LINE公式アカウント（@cityofyokohama, https://page.line.me/314eefow?openQrModal=true ／出典 https://www.city.yokohama.lg.jp/city-info/koho-kocho/koho/sns/line/line-official.html ）を開く。メニュー「粗大ごみ」から申込み。収集申込みはクレジットカード／PayPayの電子決済可。
+## 主な出典
+- 品目・手数料：https://www.sodai.city.yokohama.lg.jp/eco/view/yokohama/dustlistSearch.html?newwindow=true
+- 粗大ごみの定義：https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/chuui/chuuijikou.html
+- 収集・シール：https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/shuushuu.html
+- 電池類：https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/batteries.html
+- 持ち出し収集：https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/shien/motidasi.html
+- 減免：https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/genmen.html
+- その他は data/rules.json の各 source / url

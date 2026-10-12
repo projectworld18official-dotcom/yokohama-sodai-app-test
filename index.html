@@ -4,171 +4,203 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b6e4f">
-<title>横浜市 粗大ごみナビ（試作）</title>
+<title>横浜市 粗大ごみナビ（非公式・試用版）</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icons/icon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<a class="skip" href="#main">本文へ移動</a>
 <header class="appbar">
+  <p class="badge">横浜市の非公式案内・試用版</p>
   <h1>横浜市 粗大ごみナビ</h1>
-  <p class="sub">写真から判定・手数料・申込み手順まで（試作版）</p>
+  <p class="sub">出せるか・手数料の目安・申し込み方法を調べます</p>
 </header>
+<div id="notices" aria-live="polite"></div>
+<div id="resumeBar" class="resume" role="region" aria-label="続きから再開" hidden>
+  <p>前回の入力が残っています。</p>
+  <div class="btnrow"><button id="resumeBtn" type="button" class="btn primary">続きから再開</button><button id="freshBtn" type="button" class="btn">最初から</button></div>
+</div>
+<p id="stepInd" class="stepind" aria-live="polite"></p>
 
-<nav class="stepper" aria-label="進行状況">
-  <ol>
-    <li data-step="1" class="active">写真</li>
-    <li data-step="2">品目</li>
-    <li data-step="3">サイズ</li>
-    <li data-step="4">結果</li>
-  </ol>
-</nav>
+<main id="main">
+  <!-- ホーム -->
+  <section id="s-home" class="card screen" aria-labelledby="h-home">
+    <h2 id="h-home" tabindex="-1">出したい物の名前を入れてください</h2>
+    <form id="homeForm" role="search">
+      <label class="field" for="homeQ">品目名（例：たんす、ソファー、自転車）</label>
+      <input id="homeQ" type="search" autocomplete="off" enterkeyhint="search" placeholder="品目名を入力">
+      <button type="submit" class="btn primary big wide">🔍 品目名で調べる</button>
+    </form>
+    <p class="lead">よく出される物</p>
+    <div id="popular" class="chips"></div>
+    <hr>
+    <button id="toPhoto" type="button" class="btn wide">📷 名前がわからない時は写真で調べる</button>
+    <p class="hint">写真は任意です。このアプリは写真を外部に送りません。</p>
+  </section>
 
-<main>
-  <!-- STEP 1: 写真 -->
-  <section id="step1" class="card step">
-    <h2>1. 出したい物の写真を撮る</h2>
-    <p class="hint">最低 <strong id="minPhotosLabel">2</strong> 枚必要です。<br>例：①全体（正面） ②側面・裏面（素材表示やラベルがわかる面）。何枚でも追加できます。</p>
+  <!-- 写真（任意ルート） -->
+  <section id="s-photo" class="card screen" aria-labelledby="h-photo" hidden>
+    <h2 id="h-photo" tabindex="-1">写真で名前を調べる</h2>
+    <p class="safe">🔒 このアプリは写真を外部に送りません。写真は画面の中だけで使います。</p>
+    <p class="hint">同じ物を<b>2方向から2枚</b>撮ってください（2〜<span class="maxPhotos">4</span>枚）。顔・表札・郵便物・部屋の様子が写らないようにしてください。</p>
     <div class="btnrow">
-      <label class="btn primary file-btn">📷 カメラで撮影
-        <input id="cameraInput" type="file" accept="image/*,.heic,.heif" capture="environment" hidden>
-      </label>
-      <label class="btn file-btn">🖼 写真を選ぶ
-        <input id="galleryInput" type="file" accept="image/*,.heic,.heif" multiple hidden>
-      </label>
+      <label class="btn primary file-btn">📷 撮影する<input id="cameraInput" type="file" accept="image/*" capture="environment" hidden></label>
+      <label class="btn file-btn">🖼 写真を選ぶ<input id="galleryInput" type="file" accept="image/*" multiple hidden></label>
     </div>
-    <div id="thumbs" class="thumbs" aria-live="polite"></div>
-    <p id="photoStatus" class="status"></p>
-    <div class="actions">
-      <button id="toStep2" class="btn primary wide" disabled>次へ（品目を選ぶ）</button>
-    </div>
-    <p id="grokJump" class="jump" hidden><a href="#grokSection">🤖 品目名がわからないときは、Grokで写真を調べる（任意）↓</a></p>
+    <div id="thumbs" class="thumbs"></div>
+    <p id="photoStatus" class="status" aria-live="polite"></p>
+    <label class="check"><input id="keepPhotos" type="checkbox"> この端末に写真を一時保存して、あとで続きから再開できるようにする（24時間で自動削除）</label>
 
-    <div id="grokSection" class="grok" hidden>
-      <h3>🤖 Grokで写真を調べる（おすすめ・任意）</h3>
-      <p class="hint">品目名がわからないときは、AIの「Grok」に写真を見せると、品目名・素材・おおよそのサイズの見当をつけてくれます。使わなくても大丈夫です。そのまま「次へ」で一覧から選べます。</p>
-      <div class="about-grok">
-        <p class="about-title">Grokとは？</p>
-        <p>xAIが提供するAIアシスタントです。ブラウザ（grok.com）とiPhone・Androidアプリで使えます。<b>無料プラン（0円）があり</b>、写真を添付して質問すると、写っている物について答えてくれます。</p>
-        <p class="hint">無料プランは利用回数に上限があります（具体的な回数は公式に非公開）。アカウント登録なしで使える場合もありますが、地域や機能によっては無料のアカウント登録（Google・Apple・X・メールなど）が必要です。登録しておくと履歴も残って便利です。</p>
-        <p class="hint">はじめての方：アプリを入れるか、インストール不要のブラウザ版をどうぞ。</p>
-        <div class="store-btns">
-          <a id="storeIos" class="btn store" href="https://apps.apple.com/jp/app/grok/id6670324846" target="_blank" rel="noopener">📱 iPhone版（App Store）</a>
-          <a id="storeAndroid" class="btn store" href="https://play.google.com/store/apps/details?id=ai.x.grok&amp;hl=ja" target="_blank" rel="noopener">▶ Android版（Google Play）</a>
-          <a id="storeWeb" class="btn store" href="https://grok.com" target="_blank" rel="noopener">🌐 インストールせずブラウザで使う（grok.com）</a>
+    <details id="aiBox" class="ai">
+      <summary>任意：AI（Grokなど）に名前をたずねる</summary>
+      <p class="hint">写真の物の名前の候補を、無料のAIアプリに教えてもらう方法です。使わなくても、下の「品目名で調べる」で探せます。</p>
+      <ol class="wiz-ind" aria-label="AIにたずねる手順"><li data-w="1">①送る準備</li><li data-w="2">②Grokで質問</li><li data-w="3">③回答を貼る</li></ol>
+
+      <div class="wiz" data-w="1">
+        <h3>① 送る準備</h3>
+        <div class="privacy">
+          <p><b>写真を送る前に必ずお読みください</b></p>
+          <ul>
+            <li>写真と文章は、あなた自身の操作で<b>外部のサービス（Grokの場合はxAI社）</b>に送られます。</li>
+            <li id="xaiPolicyText"></li>
+            <li>送った写真は<b>このアプリからは削除できません</b>。削除や設定はそのサービス側で行ってください。</li>
+            <li>顔・表札・郵便物・部屋の中の様子が写った写真は送らないでください。</li>
+          </ul>
+          <p class="src"><a id="xaiPolicyLink" target="_blank" rel="noopener">xAI プライバシーポリシー（英語）</a></p>
         </div>
+        <label class="check"><input id="aiConsent" type="checkbox"> 上の内容を理解しました</label>
+        <div id="prepBox" hidden>
+          <div class="combined"><img id="combinedPreview" alt="送る画像（写真①左・②右）" hidden><p id="combinedInfo" class="hint"></p></div>
+          <div class="btnrow col">
+            <button id="sharePhotos" type="button" class="btn primary" hidden>📤 画像を共有（Grokアプリを選ぶ）</button>
+            <button id="saveCombined" type="button" class="btn">💾 保存画面を開きます</button>
+          </div>
+          <details class="sub"><summary>1枚ずつ送りたい場合</summary><div id="perPhoto" class="btnrow col"></div><p class="hint">この画面で作り直した画像なので、撮影場所（位置情報）などの情報は含まれません。</p></details>
+          <label class="field" for="grokPrompt">AIに送る文章</label>
+          <textarea id="grokPrompt" class="prompt" readonly rows="6"></textarea>
+          <button id="copyPrompt" type="button" class="btn wide">📋 文章をコピー</button>
+          <p id="copyStatus" class="status" aria-live="polite"></p>
+        </div>
+        <div class="actions"><button type="button" class="btn primary" data-wgo="2" id="w1next" disabled>次へ（②Grokで質問）</button></div>
       </div>
-      <ol class="mini-steps">
-        <li><b>写真2枚を1枚にまとめた画像をGrokに添付</b>：アプリなら下の「写真を共有」でGrokを選択。ブラウザ（grok.com）なら「まとめ画像を保存」してから、Grokの＋ボタンでその1枚を添付</li>
-        <li><b>下の文章をコピーして貼り付け</b>、1回だけ送信</li>
-        <li><b>Grokの回答をコピー</b>して、下の欄に貼り付け</li>
-      </ol>
-      <p class="hint">無料プランで足りるよう、1回のメッセージ（まとめ画像1枚＋文章）で済む内容にしています。画像生成・DeepSearch等の機能は不要です。上限に達した場合は時間をおくか、この画面の一覧から手動で選んでください。</p>
-      <label class="field">Grokに送る文章
-        <textarea id="grokPrompt" class="prompt" readonly rows="7"></textarea>
-      </label>
-      <div class="btnrow">
-        <button id="copyPrompt" type="button" class="btn primary">📋 文章をコピー</button>
-        <a id="openGrok" class="btn" href="https://grok.com" target="_blank" rel="noopener">Grokを開く ↗</a>
-      </div>
-      <div class="combined">
-        <img id="combinedPreview" alt="まとめ画像のプレビュー（①左・②右）" hidden>
-        <p id="combinedInfo" class="hint">まとめ画像を作成中…</p>
-      </div>
-      <div class="btnrow">
-        <button id="sharePhotos" type="button" class="btn" hidden>📤 写真を共有（Grokアプリへ）</button>
-        <a id="saveCombined" class="btn" download="sodai-photos.jpg" href="#" aria-disabled="true">💾 まとめ画像を保存</a>
-      </div>
-      <p id="copyStatus" class="status" aria-live="polite"></p>
 
-      <label class="field">Grokの回答を貼り付け
-        <textarea id="grokReply" rows="6" placeholder="品目名：たんす&#10;主な素材：木&#10;縦：45cm&#10;横：120cm&#10;高さ：180cm&#10;…"></textarea>
-      </label>
-      <div class="btnrow">
-        <button id="pasteReply" type="button" class="btn">📥 クリップボードから貼り付け</button>
-        <button id="parseReply" type="button" class="btn primary">回答を読み取る</button>
+      <div class="wiz" data-w="2" hidden>
+        <h3>② Grokで質問</h3>
+        <p>Grok（グロック）はxAI社のAIアシスタントです。無料プランがあり、写真を添付して質問できます（回数に上限あり）。</p>
+        <div class="btnrow col">
+          <a id="openGrok" class="btn primary" href="https://grok.com" target="_blank" rel="noopener">Grokを開く（grok.com）↗</a>
+          <a id="storeIos" class="btn store" href="https://apps.apple.com/jp/app/grok/id6670324846" target="_blank" rel="noopener">iPhone版アプリ（App Store）↗</a>
+          <a id="storeAndroid" class="btn store" href="https://play.google.com/store/apps/details?id=ai.x.grok&amp;hl=ja" target="_blank" rel="noopener">Android版アプリ（Google Play）↗</a>
+        </div>
+        <p class="hint">画像を添付し、コピーした文章を貼り付けて1回だけ送信します。ChatGPT・Gemini・Googleレンズなど、ほかの写真に対応したAIやアプリでも同じように使えます。</p>
+        <p class="hint">無料の上限に達したときは、無理に続けず名前で探してください。</p>
+        <button type="button" class="btn wide" data-gohome>🔍 品目名で調べるに戻る</button>
+        <div class="actions"><button type="button" class="btn" data-wgo="1">戻る</button><button type="button" class="btn primary" data-wgo="3">次へ（③回答を貼る）</button></div>
       </div>
-      <div id="parsedBox" class="parsed" hidden></div>
-      <p class="caution">⚠ AIの推定は間違うことがあります。品目と寸法は次の画面で必ず確認・修正してください（寸法は<b>実測推奨</b>）。粗大ごみかどうかの判定と手数料は、<b>横浜市の公式データ</b>で計算します。</p>
-      <div class="actions">
-        <button id="toStep2b" class="btn primary wide">次へ（品目を選ぶ）</button>
-      </div>
-    </div>
-  </section>
 
-  <!-- STEP 2: 品目 -->
-  <section id="step2" class="card step" hidden>
-    <h2>2. 品目を確認する</h2>
-    <div id="recogBox" class="notice"></div>
-    <div id="aiCandidates" class="chips"></div>
-    <label class="field">品目名で検索（例：ソファ、自転車、たんす）
-      <input id="searchInput" type="search" placeholder="品目名・キーワード" autocomplete="off">
-    </label>
-    <div class="chips" id="categoryChips"></div>
-    <ul id="results" class="results"></ul>
-    <details class="na-box">
-      <summary>市で回収できない物（エアコン・テレビ・冷蔵庫・洗濯機・パソコン・バイク等）</summary>
-      <ul id="naList" class="results"></ul>
+      <div class="wiz" data-w="3" hidden>
+        <h3>③ ここに回答を貼る</h3>
+        <label class="field" for="grokReply">AIの回答</label>
+        <textarea id="grokReply" rows="5" placeholder="品目名：たんす&#10;別名候補：整理たんす、チェスト&#10;回収対象外の可能性：なし"></textarea>
+        <div class="btnrow"><button id="pasteReply" type="button" class="btn">📥 貼り付け</button><button id="parseReply" type="button" class="btn primary">名前の候補を出す</button></div>
+        <div id="parsedBox" class="parsed" aria-live="polite" hidden></div>
+        <div class="actions"><button type="button" class="btn" data-wgo="2">戻る</button></div>
+      </div>
     </details>
-    <button id="notInList" class="btn ghost wide">一覧に見つからない</button>
 
-    <div id="materialBox" hidden>
-      <h3>主な素材を選んでください</h3>
-      <p class="hint">一番多く使われている素材を選択（例：脚がすべて金属のイス・机は「金属」）。</p>
-      <div id="materialOptions" class="radios"></div>
-    </div>
-    <div class="selected" id="selectedItem" hidden></div>
-    <div class="actions">
-      <button class="btn" data-back="1">戻る</button>
-      <button id="toStep3" class="btn primary" disabled>次へ（サイズ入力）</button>
-    </div>
+    <hr>
+    <button type="button" class="btn primary wide big" data-gohome>🔍 品目名で調べる</button>
   </section>
 
-  <!-- STEP 3: サイズ -->
-  <section id="step3" class="card step" hidden>
-    <h2>3. おおよそのサイズ（cm）</h2>
-    <p class="hint">メジャーで測った目安で構いません。3つとも必須です。この寸法と公式の基準で判定します。</p>
-    <form id="dimForm" novalidate>
-      <div class="dims">
-        <label class="field">縦<input id="dimD" inputmode="decimal" type="number" min="1" max="1000" step="any" required placeholder="例 45"><span class="unit">cm</span></label>
-        <label class="field">横<input id="dimW" inputmode="decimal" type="number" min="1" max="1000" step="any" required placeholder="例 180"><span class="unit">cm</span></label>
-        <label class="field">高さ<input id="dimH" inputmode="decimal" type="number" min="1" max="1000" step="any" required placeholder="例 80"><span class="unit">cm</span></label>
-      </div>
-      <label id="dimConfirmBox" class="confirm" hidden><input id="dimConfirm" type="checkbox"> Grokの推定値を実測（または目視）で確認・修正しました</label>
-      <p id="dimError" class="error" role="alert"></p>
-      <p id="dimInfo" class="hint"></p>
-      <div id="unknownMaterialBox" hidden>
-        <h3>主な素材</h3>
-        <div class="radios">
-          <label><input type="radio" name="umat" value="metal"> 金属（鉄・アルミ・ステンレス等）</label>
-          <label><input type="radio" name="umat" value="burnable"> 金属以外（木・プラスチック・布等）</label>
-          <label><input type="radio" name="umat" value="nonburnable"> 金属以外（陶磁器・石・ガラス等）</label>
+  <!-- 品目 -->
+  <section id="s-item" class="card screen" aria-labelledby="h-item" hidden>
+    <h2 id="h-item" tabindex="-1">品目を選んでください</h2>
+    <div id="cands" hidden></div>
+    <label class="field" for="q">品目名で検索</label>
+    <input id="q" type="search" autocomplete="off" enterkeyhint="search" placeholder="例：ソファー、自転車、たんす">
+    <p id="resultCount" class="hint" aria-live="polite"></p>
+    <div id="results" class="results" role="list"></div>
+    <div id="noHit" class="nohit" hidden></div>
+    <details class="na-box"><summary>市で回収できない物の一覧</summary><div id="naList" class="results" role="list"></div></details>
+    <button id="notInList" type="button" class="btn wide">一覧に見つからない</button>
+    <div class="actions"><button type="button" class="btn" data-back>戻る</button></div>
+  </section>
+
+  <!-- サイズ・状態 -->
+  <section id="s-size" class="card screen" aria-labelledby="h-size" hidden>
+    <h2 id="h-size" tabindex="-1">大きさを測ってください</h2>
+    <p id="sizeItem" class="selected"></p>
+    <div id="itemNotes"></div>
+    <form id="sizeForm" novalidate>
+      <figure class="measure" aria-hidden="true">
+        <svg viewBox="0 0 220 120" width="220" height="120"><polygon points="30,40 150,40 190,20 70,20" fill="#e7f4ee" stroke="#0b6e4f"/><polygon points="30,40 150,40 150,100 30,100" fill="#f4faf7" stroke="#0b6e4f"/><polygon points="150,40 190,20 190,80 150,100" fill="#dceee5" stroke="#0b6e4f"/><line x1="30" y1="110" x2="150" y2="110" stroke="#b42318" stroke-width="4"/><text x="90" y="119" font-size="11" text-anchor="middle" fill="#b42318">一番長い辺</text></svg>
+      </figure>
+      <label class="field" for="longest">一番長い辺（cm）<span class="req">必須</span></label>
+      <input id="longest" type="text" inputmode="decimal" autocomplete="off" placeholder="例 120" aria-describedby="longestInfo">
+      <p id="longestInfo" class="hint">メジャーで、斜めではなく辺の長さを測ります。「1.2m」「800mm」とも入力できます。スマホの計測アプリ（iPhoneの「計測」など）は誤差があるため、メジャーをおすすめします。</p>
+      <details class="sub"><summary>縦・横・高さも入れる（任意・申し込みメモに入ります）</summary>
+        <div class="dims">
+          <label class="field">縦<input id="dimD" type="text" inputmode="decimal" placeholder="cm"></label>
+          <label class="field">横<input id="dimW" type="text" inputmode="decimal" placeholder="cm"></label>
+          <label class="field">高さ<input id="dimH" type="text" inputmode="decimal" placeholder="cm"></label>
         </div>
-      </div>
-      <div class="actions">
-        <button type="button" class="btn" data-back="2">戻る</button>
-        <button id="toStep4" type="submit" class="btn primary">判定する</button>
-      </div>
+      </details>
+      <div id="nearWarn" class="warn" role="status" hidden></div>
+      <fieldset id="matQ" class="q" hidden>
+        <legend>主な素材は？</legend>
+        <p class="hint">横浜市の基準：一番長い辺が<b>金属製品で30cm以上</b>、<b>それ以外（プラスチック製品、木製品など）で50cm以上</b>が粗大ごみです。</p>
+        <label class="opt"><input type="radio" name="mat" value="metal"> 金属製品</label>
+        <label class="opt"><input type="radio" name="mat" value="nonmetal"> それ以外（プラスチック製品、木製品など）</label>
+        <label class="opt"><input type="radio" name="mat" value="unknown"> わからない</label>
+      </fieldset>
+      <fieldset id="varQ" class="q" hidden>
+        <legend>品目一覧の区分を選んでください</legend>
+        <div id="varOpts"></div>
+      </fieldset>
+      <fieldset id="batQ" class="q" hidden>
+        <legend>バッテリー（充電池）について</legend>
+        <label class="opt"><input type="radio" name="bat" value="none"> バッテリーは付いていない</label>
+        <label class="opt"><input type="radio" name="bat" value="removable"> 外せる（家庭ごみの大きさ）</label>
+        <label class="opt"><input type="radio" name="bat" value="fixed"> 外せない／バッテリー自体が大きい</label>
+        <label class="check"><input id="batDamaged" type="checkbox"> バッテリーが膨らんでいる・壊れている</label>
+      </fieldset>
+      <p id="sizeError" class="error" role="alert"></p>
+      <div class="actions"><button type="button" class="btn" data-back>戻る</button><button type="submit" class="btn primary">結果を見る</button></div>
     </form>
   </section>
 
-  <!-- STEP 4: 結果 -->
-  <section id="step4" class="card step" hidden>
-    <h2>4. 判定結果</h2>
+  <!-- バッテリー単体 -->
+  <section id="s-battery" class="card screen" aria-labelledby="h-battery" hidden>
+    <h2 id="h-battery" tabindex="-1">バッテリー・電池の出し方</h2>
+    <fieldset class="q"><legend>どの電池ですか？</legend>
+      <label class="opt"><input type="radio" name="bkind" value="car"> 自動車用・オートバイ用バッテリー</label>
+      <label class="opt"><input type="radio" name="bkind" value="small"> モバイルバッテリー・電動自転車のバッテリー・乾電池・ボタン電池など</label>
+      <label class="opt"><input type="radio" name="bkind" value="big"> 上記以外の大きなバッテリー（家庭ごみに入らない大きさ）</label>
+    </fieldset>
+    <label class="check"><input id="bDamaged" type="checkbox"> 膨らんでいる・壊れている／ポータブル電源である</label>
+    <div id="batteryResult" aria-live="polite"></div>
+    <div class="actions"><button type="button" class="btn" data-back>戻る</button><button type="button" class="btn primary" data-restart>最初から</button></div>
+  </section>
+
+  <!-- 結果 -->
+  <section id="s-result" class="card screen" aria-labelledby="h-result" hidden>
+    <h2 id="h-result" tabindex="-1">結果</h2>
     <div id="resultBox"></div>
-    <div class="actions">
-      <button class="btn" data-back="3">サイズを修正</button>
-      <button id="restart" class="btn primary">最初からやり直す</button>
-    </div>
+    <div class="actions"><button type="button" class="btn" data-back>入力を直す</button><button type="button" class="btn primary" data-restart>最初から</button></div>
   </section>
 
   <footer class="foot">
-    <p>情報源：横浜市公式サイト・横浜市粗大ごみインターネット受付（<span id="dataDate">2026-10-12</span> 取得）。手数料・ルールは変更される場合があります。申込み時に公式の金額をご確認ください。本アプリは横浜市の公式アプリではありません。<br>バージョン <span id="appVersion"></span></p>
+    <p>このアプリは横浜市の公式アプリではありません（非公式・試用版）。情報源：横浜市公式サイト・横浜市粗大ごみインターネット受付（データ取得日 <span id="dataDate">—</span>／<span id="itemCount">—</span>品目）。手数料やルールは変わることがあります。申込み時の公式の表示が正です。</p>
+    <p>運営者：（準備中）／ご意見・誤りの報告：<a id="feedbackLink" href="#" aria-disabled="true">（準備中）</a></p>
+    <p>バージョン <span id="appVersion"></span></p>
   </footer>
 </main>
 
 <div id="updateBar" class="update-bar" role="status" hidden>新しいバージョンがあります <button id="reloadBtn" type="button" class="btn">更新する</button></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="logic.js"></script>
 <script src="recognizer.js"></script>
 <script src="app.js"></script>
 </body>

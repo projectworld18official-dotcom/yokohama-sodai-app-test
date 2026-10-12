@@ -1,205 +1,261 @@
 {
-  "retrievedAt": "2026-10-12",
-  "definition": {
-    "text": "家庭から出されるもののうち、一番長い辺が、金属製品で30センチメートル以上のもの、それ以外（プラスチック商品、木製品など）で50センチメートル以上のものを事前申込みにより、有料で収集",
-    "metalThresholdCm": 30,
-    "nonMetalThresholdCm": 50,
-    "householdOnly": true,
-    "source": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/chuui/chuuijikou.html"
-  },
-  "reception": {
-    "name": "横浜市粗大ごみ受付センター",
-    "internetUrl": "https://www.sodai.city.yokohama.lg.jp/eco/view/yokohama/top.html",
-    "chatUrl": "https://www.sodai-chat.city.yokohama.lg.jp/customer/user_window?ra-a=5c1336834f55775c0aa486a3&ra-b=5c13368d26cc369e0a80c55f&ra-c=5c5279a5c174bac957048fa0&ra-winopen=true",
-    "lineInfoUrl": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/chuui/linehenkou.html",
-    "lineOfficialAccountUrl": "https://www.city.yokohama.lg.jp/city-info/koho-kocho/koho/sns/line/line-official.html",
-    "online24h": true,
-    "phoneLandline": "0570-200-530",
-    "phoneMobileIp": "045-330-3953",
-    "fax": "045-550-3599（聴覚・言語に障害のある方専用）",
-    "email": "info@sodai.city.yokohama.lg.jp（問合せ専用・申込不可）",
-    "phoneHours": "月曜日から土曜日（祝日を含む）8:30〜17:00。日曜日・年末年始（12/31〜1/3）休み",
-    "itemListUrl": "https://www.sodai.city.yokohama.lg.jp/eco/view/yokohama/dustlistSearch.html?newwindow=true",
-    "source": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/sodaigomi.html",
-    "lineAddFriendUrl": "https://page.line.me/314eefow?openQrModal=true",
-    "lineId": "@cityofyokohama",
-    "lineAccountName": "横浜市",
-    "lineSource": "https://www.city.yokohama.lg.jp/city-info/koho-kocho/koho/sns/line/line-official.html",
-    "lineHowTo": "横浜市LINE公式アカウントのリッチメニュー「粗大ごみ」をタップするとチャットボットに遷移し申込みできる（手数料・分別確認、収集日確認、申込み、確認・変更・取消）"
-  },
-  "collection": {
-    "leadTime": "受付から収集まで2週間程度",
-    "maxItems": 9,
-    "deadline": "収集日の7日前まで（例：収集日が火曜日なら前週の月曜日まで）",
-    "putOutBy": "収集日当日の朝8時まで、申込時に確認した場所へ",
-    "rain": "雨の日でも収集。油性ペンで記入",
-    "sources": [
-      "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/shuushuu.html",
-      "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/chuui/chuuijikou.html"
-    ]
-  },
-  "payment": {
-    "sticker": "粗大ごみ収集シール（手数料）を市内の本市指定の金融機関・郵便局・コンビニで購入。領収書は収集（持込み）終了まで保管。領収日付印のないものは無効。再発行不可。使用期限なし。",
-    "convenienceStores": [
-      "スリーエフ",
-      "生活彩家",
-      "セブンイレブン",
-      "デイリーヤマザキ",
-      "ファミリーマート",
-      "ポプラ",
-      "ミニストップ",
-      "ローソン"
-    ],
-    "electronic": "収集をインターネット・チャット・LINEで申し込んだ場合のみ、クレジットカード（Visa, Mastercard, JCB, American Express, Diners）・PayPayで支払い可。本受付完了メールの決済URLから収集日の3営業日前までに決済。領収書は発行されない。電話申込みでは利用不可。",
-    "electronicLabel": "電子決済の場合は縦横10cm以上の紙に「受付番号6桁」と「収集日」を書き、各品物にテープで4辺を貼る",
-    "sources": [
-      "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/shuushuu.html",
-      "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata-shousai/shushudenshikessai.html"
-    ]
-  },
-  "selfDelivery": {
-    "fee": "市が収集する場合と同じ処理手数料（収集シールは事前購入。ヤードではシールの取扱いなし）",
-    "deadline": "インターネット受付の締切は搬入日当日15時",
-    "maxItemsPerDay": 20,
-    "sakaeSimpleMaxItems": 10,
-    "rules": [
-      "原則申込者本人が持込み（本人以外は委任状が必要）",
-      "荷下ろしは原則自分で",
-      "9時より前は入場不可",
-      "事業系ごみ・市外からの持込み不可。運転免許証・車検証の確認をする場合あり"
-    ],
-    "yards": [
-      {
-        "name": "鶴見資源化センター",
-        "address": "横浜市鶴見区末広町1-15-1（鶴見工場内）",
-        "hours": "9:00〜12:00、13:00〜16:00",
-        "closed": "日曜日、年末年始"
-      },
-      {
-        "name": "長坂谷ストックヤード",
-        "address": "横浜市緑区寺山町745-45",
-        "hours": "9:00〜12:00、13:00〜16:00",
-        "closed": "日曜、年末年始"
-      },
-      {
-        "name": "神明台ストックヤード",
-        "address": "横浜市泉区池の谷3949-1（神明台処分地内）",
-        "hours": "9:00〜12:00、13:00〜16:00",
-        "closed": "日曜、年末年始"
-      },
-      {
-        "name": "栄ストックヤード",
-        "address": "横浜市栄区上郷町1570-1",
-        "hours": "9:00〜12:00、13:00〜16:00",
-        "closed": "日曜日、年末年始"
-      }
-    ],
-    "sources": [
-      "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/mochikomi.html",
-      "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata-shousai/jikohannyuyard.html"
-    ]
-  },
-  "notAccepted": [
-    {
-      "key": "kaden4",
-      "label": "エアコン・テレビ・冷蔵庫・冷凍庫・洗濯機・衣類乾燥機（家電リサイクル法対象）",
-      "match": [
-        "エアコン",
-        "テレビ",
-        "冷蔵庫",
-        "冷凍庫",
-        "洗濯機",
-        "衣類乾燥機",
-        "ワインセラー"
-      ],
-      "guidance": "買い替え時は販売店へ。処分のみで購入店不明の場合：自分で運べるなら郵便局で家電リサイクル券を購入し指定引取場所へ搬入（家電リサイクル券センター 0120-319-640）。運べないなら横浜家電リサイクル推進協議会へ申込み。",
-      "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushufuka/kadenseihin/das9.html"
-    },
-    {
-      "key": "pc",
-      "label": "パソコン（本体・ディスプレイ）",
-      "match": [
-        "パソコン",
-        "ノートパソコン",
-        "デスクトップ",
-        "PC",
-        "液晶ディスプレイ",
-        "モニター"
-      ],
-      "guidance": "PCリサイクルマーク付きはメーカーが無料回収。メーカー不明・自作等はパソコン3R推進協会（03-5282-7685）。30cm未満なら市の小型家電回収ボックス、認定事業者（リネットジャパン等）の宅配回収も可。",
-      "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushufuka/pc.html"
-    },
-    {
-      "key": "bike",
-      "label": "バイク（二輪車）",
-      "match": [
-        "バイク",
-        "オートバイ",
-        "原付",
-        "スクーター"
-      ],
-      "guidance": "二輪車リサイクルシステム（廃棄二輪車取扱店・指定引取窓口）。二輪車リサイクルコールセンター 050-3000-0727（9:30〜17:00、土日祝・年末年始等除く）。",
-      "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushufuka/das16.html"
-    },
-    {
-      "key": "extinguisher",
-      "label": "消火器",
-      "match": [
-        "消火器"
-      ],
-      "guidance": "（株）消火器リサイクル推進センター（03-5829-6773）。特定窓口・指定引取場所、またはゆうパック回収（0120-822-306、有料）。",
-      "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushufuka/syoukaki.html"
-    },
-    {
-      "key": "piano",
-      "label": "ピアノ",
-      "match": [
-        "ピアノ"
-      ],
-      "guidance": "市では回収できない品物（公式品目一覧より）。販売店・専門業者等へご相談ください。",
-      "url": "https://www.city.yokohama.lg.jp/faq/kukyoku/shigen/shigen-gyomu/20211020152815393.html"
-    },
-    {
-      "key": "tire",
-      "label": "タイヤ",
-      "match": [
-        "タイヤ"
-      ],
-      "guidance": "市では回収できない品物（公式品目一覧より）。販売店等へご相談ください。",
-      "url": "https://www.city.yokohama.lg.jp/faq/kukyoku/shigen/shigen-gyomu/20211020152815393.html"
-    },
-    {
-      "key": "safe",
-      "label": "耐火金庫",
-      "match": [
-        "耐火金庫",
-        "金庫"
-      ],
-      "guidance": "市では回収できない品物（公式品目一覧より）。",
-      "url": "https://www.city.yokohama.lg.jp/lang/residents/living-guide/garbage/garbage.html"
-    },
-    {
-      "key": "battery",
-      "label": "バッテリー",
-      "match": [
-        "バッテリー"
-      ],
-      "guidance": "家庭ごみサイズは家庭ごみの『電池類』へ。破損・膨張は資源循環局事務所へ持込み。粗大ごみサイズは粗大ごみ受付センターへ相談（公式品目一覧の注記）。",
-      "url": "https://www.sodai.city.yokohama.lg.jp/eco/view/yokohama/dustlistSearch.html?newwindow=true"
-    },
-    {
-      "key": "other",
-      "label": "引っ越し等の一時多量ごみ／工事で出たごみ／事業系ごみ／アスベストを含むもの",
-      "match": [],
-      "guidance": "粗大ごみとしては受付不可。一時多量ごみは区の資源循環局事務所へ事前申込みの上自己搬入、または一般廃棄物収集運搬許可業者へ。工事ごみは請負業者へ。",
-      "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushufuka/das6.html"
-    }
+ "retrievedAt": "2026-10-12",
+ "definition": {
+  "text": "家庭から出されるもののうち、一番長い辺が、金属製品で30センチメートル以上のもの、それ以外（プラスチック商品、木製品など）で50センチメートル以上のものを事前申込みにより、有料で収集",
+  "metalThresholdCm": 30,
+  "nonMetalThresholdCm": 50,
+  "householdOnly": true,
+  "source": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/chuui/chuuijikou.html"
+ },
+ "reception": {
+  "name": "横浜市粗大ごみ受付センター",
+  "internetUrl": "https://www.sodai.city.yokohama.lg.jp/eco/view/yokohama/top.html",
+  "chatUrl": "https://www.sodai-chat.city.yokohama.lg.jp/customer/user_window?ra-a=5c1336834f55775c0aa486a3&ra-b=5c13368d26cc369e0a80c55f&ra-c=5c5279a5c174bac957048fa0&ra-winopen=true",
+  "lineInfoUrl": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/chuui/linehenkou.html",
+  "lineOfficialAccountUrl": "https://www.city.yokohama.lg.jp/city-info/koho-kocho/koho/sns/line/line-official.html",
+  "online24h": true,
+  "phoneLandline": "0570-200-530",
+  "phoneMobileIp": "045-330-3953",
+  "fax": "045-550-3599（聴覚・言語に障害のある方専用）",
+  "email": "info@sodai.city.yokohama.lg.jp（問合せ専用・申込不可）",
+  "phoneHours": "月曜日から土曜日（祝日を含む）8:30〜17:00。日曜日・年末年始（12/31〜1/3）休み",
+  "itemListUrl": "https://www.sodai.city.yokohama.lg.jp/eco/view/yokohama/dustlistSearch.html?newwindow=true",
+  "source": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/sodaigomi.html",
+  "lineAddFriendUrl": "https://page.line.me/314eefow?openQrModal=true",
+  "lineId": "@cityofyokohama",
+  "lineAccountName": "横浜市",
+  "lineSource": "https://www.city.yokohama.lg.jp/city-info/koho-kocho/koho/sns/line/line-official.html",
+  "lineHowTo": "横浜市LINE公式アカウントのリッチメニュー「粗大ごみ」をタップするとチャットボットに遷移し申込みできる（手数料・分別確認、収集日確認、申込み、確認・変更・取消）",
+  "jimushoUrl": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/shokai/jimusho/jimusho.html"
+ },
+ "collection": {
+  "leadTime": "受付から収集まで2週間程度",
+  "maxItems": 9,
+  "deadline": "収集日の7日前まで（例：収集日が火曜日なら前週の月曜日まで）",
+  "putOutBy": "収集日当日の朝8時まで、申込時に確認した場所へ",
+  "rain": "雨の日でも収集。油性ペンで記入",
+  "sources": [
+   "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/shuushuu.html",
+   "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/chuui/chuuijikou.html"
   ],
-  "smallItemGuide": {
-    "text": "粗大ごみサイズ未満のものは家庭ごみ・資源物として分別して出します。",
-    "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/dashikata.html"
+  "maxItemsNote": "1回の申込みは9個まで（公式表記）"
+ },
+ "payment": {
+  "sticker": "粗大ごみ収集シール（手数料）を市内の本市指定の金融機関・郵便局・コンビニで購入。領収書は収集（持込み）終了まで保管。領収日付印のないものは無効。再発行不可。使用期限なし。",
+  "convenienceStores": [
+   "スリーエフ",
+   "生活彩家",
+   "セブンイレブン",
+   "デイリーヤマザキ",
+   "ファミリーマート",
+   "ポプラ",
+   "ミニストップ",
+   "ローソン"
+  ],
+  "electronic": "収集をインターネット・チャット・LINEで申し込んだ場合のみ、クレジットカード（Visa, Mastercard, JCB, American Express, Diners）・PayPayで支払い可。本受付完了メールの決済URLから収集日の3営業日前までに決済。領収書は発行されない。電話申込みでは利用不可。",
+  "electronicLabel": "電子決済の場合は縦横10cm以上の紙に「受付番号6桁」と「収集日」を書き、各品物にテープで4辺を貼る",
+  "sources": [
+   "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/shuushuu.html",
+   "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata-shousai/shushudenshikessai.html"
+  ]
+ },
+ "selfDelivery": {
+  "fee": "市が収集する場合と同じ処理手数料（収集シールは事前購入。ヤードではシールの取扱いなし）",
+  "deadline": "インターネット受付の締切は搬入日当日15時",
+  "maxItemsPerDay": 20,
+  "sakaeSimpleMaxItems": 10,
+  "rules": [
+   "原則申込者本人が持込み（本人以外は委任状が必要）",
+   "荷下ろしは原則自分で",
+   "9時より前は入場不可",
+   "事業系ごみ・市外からの持込み不可。運転免許証・車検証の確認をする場合あり"
+  ],
+  "yards": [
+   {
+    "name": "鶴見資源化センター",
+    "address": "横浜市鶴見区末広町1-15-1（鶴見工場内）",
+    "hours": "9:00〜12:00、13:00〜16:00",
+    "closed": "日曜日、年末年始"
+   },
+   {
+    "name": "長坂谷ストックヤード",
+    "address": "横浜市緑区寺山町745-45",
+    "hours": "9:00〜12:00、13:00〜16:00",
+    "closed": "日曜、年末年始"
+   },
+   {
+    "name": "神明台ストックヤード",
+    "address": "横浜市泉区池の谷3949-1（神明台処分地内）",
+    "hours": "9:00〜12:00、13:00〜16:00",
+    "closed": "日曜、年末年始"
+   },
+   {
+    "name": "栄ストックヤード",
+    "address": "横浜市栄区上郷町1570-1",
+    "hours": "9:00〜12:00、13:00〜16:00",
+    "closed": "日曜日、年末年始"
+   }
+  ],
+  "sources": [
+   "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/mochikomi.html",
+   "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata-shousai/jikohannyuyard.html"
+  ]
+ },
+ "notAccepted": [
+  {
+   "key": "kaden4",
+   "label": "エアコン・テレビ・冷蔵庫・冷凍庫・洗濯機・衣類乾燥機（家電リサイクル法対象）",
+   "match": [
+    "エアコン",
+    "テレビ",
+    "冷蔵庫",
+    "冷凍庫",
+    "洗濯機",
+    "衣類乾燥機",
+    "ワインセラー"
+   ],
+   "guidance": "買い替え時は販売店へ。処分のみで購入店不明の場合：自分で運べるなら郵便局で家電リサイクル券を購入し指定引取場所へ搬入（家電リサイクル券センター 0120-319-640）。運べないなら横浜家電リサイクル推進協議会へ申込み。",
+   "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushufuka/kadenseihin/das9.html"
   },
-  "reuse": {
-    "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/sodaigomi.html"
+  {
+   "key": "pc",
+   "label": "パソコン（本体・ディスプレイ）",
+   "match": [
+    "パソコン",
+    "ノートパソコン",
+    "デスクトップ",
+    "PC",
+    "液晶ディスプレイ",
+    "モニター"
+   ],
+   "guidance": "PCリサイクルマーク付きはメーカーが無料回収。メーカー不明・自作等はパソコン3R推進協会（03-5282-7685）。30cm未満なら市の小型家電回収ボックス、認定事業者（リネットジャパン等）の宅配回収も可。",
+   "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushufuka/pc.html"
+  },
+  {
+   "key": "bike",
+   "label": "バイク（二輪車）",
+   "match": [
+    "バイク",
+    "オートバイ",
+    "原付",
+    "スクーター"
+   ],
+   "guidance": "二輪車リサイクルシステム（廃棄二輪車取扱店・指定引取窓口）。二輪車リサイクルコールセンター 050-3000-0727（9:30〜17:00、土日祝・年末年始等除く）。",
+   "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushufuka/das16.html"
+  },
+  {
+   "key": "extinguisher",
+   "label": "消火器",
+   "match": [
+    "消火器"
+   ],
+   "guidance": "（株）消火器リサイクル推進センター（03-5829-6773）。特定窓口・指定引取場所、またはゆうパック回収（0120-822-306、有料）。",
+   "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushufuka/syoukaki.html"
+  },
+  {
+   "key": "piano",
+   "label": "ピアノ",
+   "match": [
+    "ピアノ"
+   ],
+   "guidance": "市では回収できない品物（公式品目一覧より）。販売店・専門業者等へご相談ください。",
+   "url": "https://www.city.yokohama.lg.jp/faq/kukyoku/shigen/shigen-gyomu/20211020152815393.html"
+  },
+  {
+   "key": "tire",
+   "label": "タイヤ",
+   "match": [
+    "タイヤ"
+   ],
+   "guidance": "市では回収できない品物（公式品目一覧より）。販売店等へご相談ください。",
+   "url": "https://www.city.yokohama.lg.jp/faq/kukyoku/shigen/shigen-gyomu/20211020152815393.html"
+  },
+  {
+   "key": "safe",
+   "label": "耐火金庫",
+   "match": [
+    "耐火金庫",
+    "金庫"
+   ],
+   "guidance": "市では回収できない品物（公式品目一覧より）。",
+   "url": "https://www.city.yokohama.lg.jp/lang/residents/living-guide/garbage/garbage.html"
+  },
+  {
+   "key": "battery",
+   "label": "バッテリー（単体）",
+   "match": [
+    "バッテリー",
+    "電池",
+    "モバイルバッテリー"
+   ],
+   "guidance": "種類と状態で出し方が変わります。下の質問に答えてください。",
+   "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/batteries.html",
+   "battery": true
+  },
+  {
+   "key": "other",
+   "label": "引っ越し等の一時多量ごみ／工事で出たごみ／事業系ごみ／アスベストを含むもの",
+   "match": [],
+   "guidance": "粗大ごみとしては受付不可。一時多量ごみは区の資源循環局事務所へ事前申込みの上自己搬入、または一般廃棄物収集運搬許可業者へ。工事ごみは請負業者へ。",
+   "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushufuka/das6.html"
   }
+ ],
+ "smallItemGuide": {
+  "text": "粗大ごみサイズ未満のものは家庭ごみ・資源物として分別して出します。",
+  "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/dashikata.html"
+ },
+ "reuse": {
+  "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/sodaigomi.html"
+ },
+ "schemaVersion": 5,
+ "battery": {
+  "retrieved": "2026-10-12",
+  "small": "小型充電式電池（モバイルバッテリー・電動自転車のバッテリー等。ニカド・ニッケル水素電池も対象）・乾電池・コイン電池・ボタン電池は「電池類」として、週2回の「燃やすごみ」の日に電池類だけを1つの透明か半透明の袋に入れて出す。可能な限り使い切り、端子部をテープ等で絶縁する。",
+  "damaged": "膨張・破損した電池やポータブル電源は集積場所に出せない。各区の資源循環局事務所に持ち込む（回収時間 9:00〜16:00 月曜日〜土曜日。11:30〜13:30は避ける）。",
+  "car": "自動車用・オートバイ用のバッテリーは市では収集できない。販売店・メーカー等に相談。",
+  "builtInSmall": "バッテリーの取り外せない小型家電（手持ち扇風機、携帯ゲーム機など）は、燃やすごみの日に他のごみとは「別の袋」で出す。",
+  "builtInSodai": "（粗大ごみ品目の注記）バッテリーが家庭ごみサイズなら外して「電池類」へ（破損・膨張は資源循環局事務所へ持込み）。バッテリーが外せない、またはバッテリーが粗大ごみサイズの場合は、本体の材質に関わらず「資）」の品目で申し込み、バッテリーは付けたまま出す。バッテリーが破損・膨張している場合は粗大ごみ受付センターへ相談。",
+  "sodaiSizeBattery": "バッテリー単体が粗大ごみサイズの場合は粗大ごみ受付センターへ相談（品目一覧「バッテリー【受付不可】」の注記）。",
+  "sources": [
+   "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/batteries.html",
+   "https://www.city.yokohama.lg.jp/faq/kukyoku/shigen/shigen-gyomu/judenshiki.html",
+   "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/das4.html"
+  ]
+ },
+ "support": {
+  "carryOut": {
+   "title": "持ち出し収集",
+   "text": "ひとり暮らしの高齢者・障害者等で、自分で粗大ごみを家の外まで運び出すことができず、家族や近隣の方などの協力も得られない方は、職員が家の中から運び出す「持ち出し収集」を利用できる場合があります。手数料は通常の収集と同じ。申込みは、お住まいの区の資源循環局事務所へ電話（月〜土（祝日含む）8:00〜16:45）。分解が必要な物、窓からロープで降ろす・重機が必要な物は対象外。事前訪問があることや、当日は申込者本人の立会いが必要です。",
+   "targetsSummary": "例：身体障害者手帳・愛の手帳・精神障害者保健福祉手帳をお持ちの方、要介護・要支援の方、65歳以上で持ち出しができない方など（詳しい条件は公式ページ）",
+   "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/shien/motidasi.html"
+  },
+  "exemption": {
+   "title": "粗大ごみ手数料の減免",
+   "text": "生活保護を受けている世帯、一定の障害のある方、要介護4・5の65歳以上の方、70歳以上で自己搬入が困難な一人暮らしの方（福祉保健センター長が認めた方）などは、年度（4/1〜3/31）に4個まで手数料が全額免除になる場合があります。申込み（インターネット・電話）の際に申し出てください。",
+   "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/dashikata/genmen.html"
+  }
+ },
+ "notices": [
+  {
+   "id": "maint-20261024",
+   "level": "warn",
+   "text": "システムメンテナンスのため、令和8年10月24日(土)17:00〜10月26日(月)8:30は粗大ごみの申込み（インターネット・チャット・LINE・電話を含むすべての方法）ができません。",
+   "start": "2026-10-01T00:00:00+09:00",
+   "end": "2026-10-26T08:30:00+09:00",
+   "url": "https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/gomi/shushu/sodaigomi/chuui/sodai_maintenance.html"
+  },
+  {
+   "id": "line-menu-20261014",
+   "level": "info",
+   "text": "横浜市LINE公式アカウントはメニュー変更のため、10月14日(水)0:00〜5:30に一部機能が使えない場合があります。",
+   "start": "2026-10-09T00:00:00+09:00",
+   "end": "2026-10-14T05:30:00+09:00",
+   "url": "https://www.city.yokohama.lg.jp/city-info/koho-kocho/koho/sns/line/line-official.html"
+  }
+ ],
+ "privacy": {
+  "xaiPolicyUrl": "https://x.ai/legal/privacy-policy",
+  "xaiPolicyUpdated": "October 11, 2026",
+  "summary": "xAIのプライバシーポリシー（2026年10月11日更新）では、プロンプトや画像などの入力（Input）は個人情報を含みうる「User Content」として扱われ、サービスの開発・改善（モデルの学習を含む）に利用されることがあると記載されています。"
+ }
 }
