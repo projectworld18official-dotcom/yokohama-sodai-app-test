@@ -1,0 +1,2499 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="ハマのクレーン 物理修正 プレビュー・検証用。">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10243a">
+<title>ハマのクレーン</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #0c1c2e;
+    color: #fff6e8;
+    font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", "YuGothic", Meiryo, sans-serif;
+  }
+  button, a { font-family: inherit; }
+  #app {
+    height: 100dvh;
+    max-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    overflow: hidden;
+  }
+  header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 4px 6px;
+    background: #10243a;
+  }
+  header a {
+    color: #fff6e8;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.25;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  #remain {
+    flex: 0 0 auto;
+    font-size: 14px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .tools {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  #got { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #sound {
+    width: 48px;
+    height: 36px;
+    border-radius: 10px;
+    border: 2px solid #e6c36a;
+    background: #18324a;
+    color: #fff6e8;
+    font-weight: 800;
+    font-size: 12px;
+    padding: 0;
+  }
+  #sound[aria-pressed="true"] { background: #1c8c98; color: #fff6e8; }
+  #stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 50% 0%, #1a4564 0%, transparent 58%),
+      linear-gradient(#0e2438, #07131f);
+  }
+  canvas { display: block; touch-action: none; }
+  .controls {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+    background: #0b1a2b;
+  }
+  .controls button {
+    flex: 1 1 150px;
+    min-width: 0;
+    max-width: 240px;
+    height: 96px;
+    border-radius: 18px;
+    border: 3px solid #e6c36a;
+    color: #fff6e8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-size: 40px;
+    font-weight: 900;
+    line-height: 1;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .controls button small {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  #btn-right { background: linear-gradient(#3d7d96, #1a5368); }
+  #btn-down { background: linear-gradient(#e2555c, #9e2430); }
+  .controls button.used { filter: grayscale(0.65) brightness(0.72); }
+  .controls button.held { transform: translateY(3px); }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    background: rgba(7, 16, 28, 0.42);
+    overflow: hidden;
+  }
+  .overlay[hidden] { display: none; }
+  .card {
+    width: min(100%, 336px);
+    max-height: 100%;
+    overflow: auto;
+    background: #fff6e8;
+    color: #1b2430;
+    border-radius: 18px;
+    border: 3px solid #e6c36a;
+    padding: 14px 14px 12px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  }
+  .card h1 {
+    margin: 0 0 4px;
+    font-size: 26px;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    color: #9e2430;
+  }
+  .card p { margin: 0 0 10px; font-size: 13px; line-height: 1.45; }
+  .diffs { display: flex; gap: 6px; margin-bottom: 8px; }
+  .diffs button, .row button, .card .ghost {
+    border-radius: 12px;
+    border: 2px solid #c9a15a;
+    background: #fff;
+    color: #1b2430;
+    font-weight: 800;
+    min-height: 44px;
+    padding: 8px 6px;
+  }
+  .diffs button { flex: 1; font-size: 14px; }
+  .diffs button[aria-pressed="true"] {
+    background: #9e2430;
+    color: #fff6e8;
+    border-color: #9e2430;
+  }
+  .best { font-size: 12px; color: #3d4c5c; }
+  .row { display: flex; gap: 8px; }
+  .row button { flex: 1; font-size: 16px; }
+  .row .go {
+    background: #d23b45;
+    color: #fff6e8;
+    border-color: #9e2430;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .cell {
+    background: #fff;
+    border: 2px solid #ead9b0;
+    border-radius: 12px;
+    text-align: center;
+    padding: 6px 2px 8px;
+  }
+  .cell canvas { width: 64px; height: 64px; margin: 0 auto; }
+  .cell b { display: block; font-size: 11px; line-height: 1.3; }
+  .cell span { font-size: 13px; font-weight: 800; color: #9e2430; }
+  .cell.off { opacity: 0.38; }
+  #result-count { font-size: 42px; font-weight: 900; margin: 0; color: #9e2430; line-height: 1; }
+  #test {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: 6px;
+    z-index: 6;
+    max-height: 46%;
+    overflow: auto;
+    background: rgba(8, 18, 30, 0.92);
+    color: #fff6e8;
+    border: 2px solid #e6c36a;
+    border-radius: 12px;
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  #test[hidden] { display: none; }
+  #test-verdict { font-size: 22px; letter-spacing: 0.08em; }
+  #test-verdict.pass { color: #9be7c4; }
+  #test-verdict.fail { color: #ffb4b0; }
+  #test ol { margin: 6px 0 0; padding-left: 1.2em; }
+  #test li { margin: 0 0 3px; }
+  @media (prefers-reduced-motion: reduce) {
+    .controls button.held { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <a href="/games/">ゲーム一覧へ戻る</a>
+    <div id="remain">のこり 10</div>
+    <div class="tools">
+      <div id="got">獲得 0</div>
+      <button id="sound" type="button" aria-pressed="false">音OFF</button>
+    </div>
+  </header>
+  <div id="stage">
+    <canvas id="game" width="360" height="520"></canvas>
+    <div id="title" class="overlay">
+      <div class="card">
+        <h1>ハマのクレーン</h1>
+        <p>アームを止めて、爪を下ろす。重さと狙いが、落ちるかどうかを分ける。</p>
+        <div class="diffs" role="group" aria-label="難易度">
+          <button type="button" data-diff="easy">やさしい</button>
+          <button type="button" data-diff="normal" aria-pressed="true">ふつう</button>
+          <button type="button" data-diff="hard">むずかしい</button>
+        </div>
+        <p class="best">最高　やさしい <b id="best-easy">0</b>　ふつう <b id="best-normal">0</b>　むずかしい <b id="best-hard">0</b></p>
+        <div class="row">
+          <button type="button" class="go" id="play-btn">あそぶ</button>
+          <button type="button" id="open-col">コレクション</button>
+        </div>
+      </div>
+    </div>
+    <div id="result" class="overlay" hidden>
+      <div class="card">
+        <p>10回おわった</p>
+        <p id="result-count">0</p>
+        <p id="result-note">獲得</p>
+        <div class="row">
+          <button type="button" class="go" id="again">もういちど</button>
+          <button type="button" id="result-col">コレクション</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button type="button" class="ghost" id="back-title">難易度をかえる</button>
+        </div>
+      </div>
+    </div>
+    <div id="collection" class="overlay" hidden>
+      <div class="card">
+        <h1 style="font-size:20px">コレクション</h1>
+        <p id="play-total">あそんだ回数 0</p>
+        <div class="grid" id="grid"></div>
+        <div class="row" style="margin-top:10px">
+          <button type="button" class="go" id="close-col">とじる</button>
+        </div>
+      </div>
+    </div>
+    <div id="test" hidden>
+      <div id="test-verdict">テスト中</div>
+      <ol id="test-list"></ol>
+    </div>
+  </div>
+  <div class="controls">
+    <button id="btn-right" type="button">→<small>はなすと止まる</small></button>
+    <button id="btn-down" type="button">↓<small>おりてつかむ</small></button>
+  </div>
+</div>
+<script>
+// Side-view crane: custom 2D rigid bodies (circles + rotated boxes).
+// Sequential impulse, fixed 1/60s. No third-party physics engine.
+// PHYSICS FIX 2026-11-07: Claw-prize collisions now use hard kinematic resolution
+// in solveContacts (strong position correction + impulse). softClaw soft-push removed.
+// Prevents claw tip from penetrating prizes. Rules unchanged.
+
+const STEP = 1 / 60;
+const G = 1480;
+
+const WORLD = {
+  w: 360,
+  h: 520,
+  innerL: 30,
+  innerR: 330,
+  innerT: 86,
+  floorY: 446,
+  chuteBottom: 508,
+  homeX: 80,
+  homeY: 114,
+  maxX: 304,
+  prong: 84,
+  openSpread: 0.82,
+  closedSpread: 0.2,
+  looseSpread: 0.4,
+  moveSpeed: 180,
+  downSpeed: 220,
+  upSpeed: 160,
+  returnSpeed: 200,
+  closeSec: 0.34,
+  openSec: 0.28,
+  plays: 10,
+};
+
+const FORCES = {
+  strong: 11000,
+  normal: 6200,
+  normalHalf: 800,
+  weak: 520,
+};
+
+const CATALOG = {
+  shumai: { name: "シュウマイん", shape: "circle", r: 22, mass: 0.58, friction: 0.64, restitution: 0.14 },
+  kamome: { name: "カモメまる", shape: "circle", r: 20, mass: 0.56, friction: 0.6, restitution: 0.16 },
+  lantern: { name: "ランタンちゃん", shape: "circle", r: 21, mass: 0.84, friction: 0.52, restitution: 0.12 },
+  kakigori: { name: "氷っぽん", shape: "circle", r: 18, mass: 0.38, friction: 0.56, restitution: 0.18 },
+  brick: { name: "赤レンガ箱", shape: "box", hw: 22, hh: 18, mass: 1.28, friction: 0.72, restitution: 0.04 },
+  wheel: { name: "観覧車ボックス", shape: "box", hw: 24, hh: 20, mass: 1.08, friction: 0.62, restitution: 0.05 },
+  bridge: { name: "ベイブリッジ箱", shape: "box", hw: 21, hh: 17, mass: 1.62, friction: 0.7, restitution: 0.04 },
+  tug: { name: "タグボート", shape: "box", hw: 38, hh: 13, mass: 1.38, friction: 0.5, restitution: 0.04 },
+  anchor: { name: "いかりぬい", shape: "box", hw: 32, hh: 12, mass: 2.25, friction: 0.46, restitution: 0.03 },
+};
+
+const KIND_ORDER = Object.keys(CATALOG);
+
+const DIFF = {
+  easy: { label: "やさしい", holeL: 38, holeR: 126, massMul: 0.72, frictionMul: 1.18 },
+  normal: { label: "ふつう", holeL: 46, holeR: 112, massMul: 1, frictionMul: 1 },
+  hard: { label: "むずかしい", holeL: 58, holeR: 102, massMul: 1.45, frictionMul: 0.72 },
+};
+
+const LAYOUTS = {
+  easy: [
+    ["bridge", 188, 424],
+    ["shumai", 236, 420],
+    ["brick", 286, 424],
+    ["kamome", 210, 360],
+    ["kakigori", 262, 360],
+    ["lantern", 236, 300],
+    ["wheel", 200, 290],
+    ["tug", 270, 240],
+    ["anchor", 230, 190],
+  ],
+  normal: [
+    ["bridge", 210, 424],
+    ["shumai", 258, 420],
+    ["brick", 306, 424],
+    ["kamome", 232, 360],
+    ["kakigori", 284, 360],
+    ["lantern", 258, 300],
+    ["wheel", 220, 290],
+    ["tug", 292, 240],
+    ["anchor", 250, 190],
+  ],
+  hard: [
+    ["bridge", 228, 424],
+    ["shumai", 276, 420],
+    ["brick", 312, 424],
+    ["kamome", 250, 360],
+    ["kakigori", 300, 360],
+    ["lantern", 276, 300],
+    ["wheel", 240, 290],
+    ["tug", 300, 240],
+    ["anchor", 262, 190],
+  ],
+};
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function rand() {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function rollGrip(rng, pity) {
+  const r = rng();
+  if (pity) {
+    if (r < 0.5) return "strong";
+    if (r < 0.5 + 0.34375) return "normal";
+    return "weak";
+  }
+  if (r < 0.2) return "strong";
+  if (r < 0.75) return "normal";
+  return "weak";
+}
+
+function pityActive(playNumber, caught) {
+  return playNumber === 10 && caught === 0;
+}
+
+function crossesHole(x, y, hole) {
+  return y > hole.lineY && x > hole.l && x < hole.r;
+}
+
+function clamp(v, a, b) {
+  return v < a ? a : v > b ? b : v;
+}
+
+function makeDyn(kind, x, y, diff) {
+  const c = CATALOG[kind];
+  const mass = c.mass * diff.massMul;
+  const friction = c.friction * diff.frictionMul;
+  let I;
+  if (c.shape === "circle") I = 0.5 * mass * c.r * c.r;
+  else I = (mass * (c.hw * c.hw + c.hh * c.hh)) / 3;
+  const body = {
+    id: kind,
+    kind,
+    shape: c.shape,
+    x,
+    y,
+    a: 0,
+    vx: 0,
+    vy: 0,
+    w: 0,
+    mass,
+    invM: 1 / mass,
+    invI: 1 / I,
+    friction,
+    restitution: c.restitution,
+    static: false,
+    claw: false,
+    hook: false,
+    r: c.r || 0,
+    hw: c.hw || 0,
+    hh: c.hh || 0,
+  };
+  body.R = c.shape === "circle" ? c.r : Math.hypot(c.hw, c.hh);
+  return body;
+}
+
+function makeBox(x, y, hw, hh, friction) {
+  return {
+    id: "wall",
+    shape: "box",
+    x,
+    y,
+    a: 0,
+    vx: 0,
+    vy: 0,
+    w: 0,
+    mass: 0,
+    invM: 0,
+    invI: 0,
+    friction: friction ?? 0.85,
+    restitution: 0.02,
+    static: true,
+    claw: false,
+    hook: false,
+    hw,
+    hh,
+    r: 0,
+    R: Math.hypot(hw, hh),
+  };
+}
+
+function makeWalls(diff) {
+  const { innerL, innerR, innerT, floorY, chuteBottom, w } = WORLD;
+  const walls = [];
+  const midY = (innerT + floorY) / 2;
+  const halfH = (floorY - innerT) / 2;
+  walls.push(makeBox(innerL - 14, midY, 14, halfH + 4, 0.9));
+  walls.push(makeBox(innerR + 14, midY, 14, halfH + 4, 0.9));
+  walls.push(makeBox((innerL + innerR) / 2, innerT - 10, (innerR - innerL) / 2 + 8, 10, 0.4));
+  const lip = (l, r) => {
+    if (r - l < 4) return;
+    const hw = (r - l) / 2;
+    walls.push(makeBox(l + hw, floorY + 14, hw, 14, 0.92));
+  };
+  lip(innerL, diff.holeL);
+  lip(diff.holeR, innerR);
+  // Low rims so the pile cannot trickle into the chute. A lift or a real shove still clears them.
+  walls.push(makeBox(diff.holeL - 6, floorY - 10, 6, 10, 0.98));
+  walls.push(makeBox(diff.holeR + 6, floorY - 10, 6, 10, 0.98));
+  const shaftTop = floorY;
+  const shaftH = (chuteBottom + 24 - shaftTop) / 2;
+  const shaftY = shaftTop + shaftH;
+  walls.push(makeBox((innerL + diff.holeL) / 2, shaftY, (diff.holeL - innerL) / 2 + 2, shaftH, 0.5));
+  walls.push(makeBox((diff.holeR + innerR) / 2, shaftY, (innerR - diff.holeR) / 2 + 2, shaftH, 0.5));
+  walls.push(makeBox((diff.holeL + diff.holeR) / 2, chuteBottom + 16, (diff.holeR - diff.holeL) / 2 + 6, 16, 0.6));
+  walls.push(makeBox(w / 2, chuteBottom + 40, w / 2, 16, 0.6));
+  return walls;
+}
+
+function makeClawPart(hook) {
+  return {
+    id: hook ? "hook" : "prong",
+    shape: "box",
+    x: 0,
+    y: 0,
+    a: 0,
+    vx: 0,
+    vy: 0,
+    w: 0,
+    mass: 0,
+    invM: 0,
+    invI: 0,
+    friction: hook ? 0.95 : 0.55,
+    restitution: 0.02,
+    static: false,
+    claw: true,
+    hook,
+    hw: hook ? 12 : 5,
+    hh: hook ? 4.5 : 32,
+    r: 0,
+    R: hook ? 16 : 40,
+  };
+}
+
+function clawPose(s) {
+  const L = WORLD.prong;
+  const spread = s.spread;
+  const tipL = {
+    x: s.armX + Math.sin(-spread) * L,
+    y: s.armY + Math.cos(spread) * L,
+  };
+  const tipR = {
+    x: s.armX + Math.sin(spread) * L,
+    y: s.armY + Math.cos(spread) * L,
+  };
+  return { hubX: s.armX, hubY: s.armY, tipL, tipR, spread, L };
+}
+
+function maxDropY() {
+  const open = WORLD.openSpread;
+  const tipDrop = Math.cos(open) * WORLD.prong + 6;
+  return WORLD.floorY - tipDrop - 3;
+}
+
+function placeProng(body, x0, y0, x1, y1) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const len = Math.hypot(dx, dy) || 1;
+  body.x = (x0 + x1) / 2;
+  body.y = (y0 + y1) / 2;
+  body.hh = len / 2;
+  body.hw = 5;
+  body.a = Math.atan2(-dx, dy);
+  body.R = Math.hypot(body.hw, body.hh);
+  body.vx = 0;
+  body.vy = 0;
+  body.w = 0;
+}
+
+function updateClaw(s) {
+  const pose = clawPose(s);
+  const base = 18;
+  const leftBase = {
+    x: s.armX + Math.sin(-s.spread) * base,
+    y: s.armY + Math.cos(s.spread) * base,
+  };
+  const rightBase = {
+    x: s.armX + Math.sin(s.spread) * base,
+    y: s.armY + Math.cos(s.spread) * base,
+  };
+  placeProng(s.claws[0], leftBase.x, leftBase.y, pose.tipL.x, pose.tipL.y);
+  placeProng(s.claws[1], rightBase.x, rightBase.y, pose.tipR.x, pose.tipR.y);
+  const hL = s.claws[2];
+  const hR = s.claws[3];
+  hL.hw = 12;
+  hL.hh = 4.5;
+  hL.a = 0;
+  hL.x = pose.tipL.x + 12;
+  hL.y = pose.tipL.y - 1;
+  hL.R = 16;
+  hR.hw = 12;
+  hR.hh = 4.5;
+  hR.a = 0;
+  hR.x = pose.tipR.x - 12;
+  hR.y = pose.tipR.y - 1;
+  hR.R = 16;
+  const dt = STEP;
+  for (const c of s.claws) {
+    c.vx = s.armVx;
+    c.vy = s.armVy;
+    c.w = 0;
+    if (c._px != null) {
+      c.vx = (c.x - c._px) / dt;
+      c.vy = (c.y - c._py) / dt;
+    }
+    c._px = c.x;
+    c._py = c.y;
+  }
+}
+
+function setForces(s, prog) {
+  const k = s.gripKind;
+  if (!k || s.phase === "open" || s.phase === "wait" || s.phase === "ready" || s.phase === "over" || s.phase === "title" || s.phase === "boot") {
+    if (s.phase !== "close" && s.phase !== "down" && s.phase !== "up" && s.phase !== "return") {
+      s.hooksSolid = false;
+    }
+    return;
+  }
+  if (k === "strong") {
+    s.gripForce = FORCES.strong;
+    s.hooksSolid = true;
+    s.spreadTarget = WORLD.closedSpread;
+  } else if (k === "normal") {
+    if (prog >= 0.4) {
+      s.gripForce = FORCES.normalHalf;
+      s.hooksSolid = false;
+      s.spreadTarget = WORLD.looseSpread;
+    } else {
+      s.gripForce = FORCES.normal;
+      s.hooksSolid = true;
+      s.spreadTarget = WORLD.closedSpread;
+    }
+  } else {
+    s.gripForce = FORCES.weak;
+    s.hooksSolid = false;
+    s.spreadTarget = WORLD.looseSpread;
+  }
+}
+
+function tryGrab(s) {
+  const pose = clawPose(s);
+  const reachY = Math.max(pose.tipL.y, pose.tipR.y);
+  let best = null;
+  let bestD = 1e9;
+  for (const p of s.prizes) {
+    const dx = Math.abs(p.x - s.armX);
+    const sweet = p.shape === "circle" ? p.r * 0.7 : Math.min(p.hw, p.hh) * 0.9;
+    if (dx > sweet + 8) continue;
+    if (p.y < s.armY + 20 || p.y > reachY + 16) continue;
+    const d = dx * 1.4 + Math.abs(p.y - reachY) * 0.2;
+    if (d < bestD) {
+      best = p;
+      bestD = d;
+    }
+  }
+  if (!best) {
+    s.grip = null;
+    return;
+  }
+  s.grip = { id: best.id, ox: best.x - s.armX, oy: best.y - s.armY };
+}
+
+function pushSfx(s, name) {
+  if (s.sfx.length < 12) s.sfx.push(name);
+}
+
+function finishPlay(s) {
+  s.rightUsed = false;
+  s.downUsed = false;
+  s.holdRight = false;
+  s._planned = false;
+  s.grip = null;
+  s.gripForce = 0;
+  s.hooksSolid = false;
+  s.spreadTarget = WORLD.openSpread;
+  if (s.playsStarted >= WORLD.plays) {
+    s.phase = "over";
+    pushSfx(s, "over");
+  } else {
+    s.phase = "ready";
+  }
+}
+
+function updateMachine(s) {
+  const dt = STEP;
+  const prevX = s.armX;
+  const prevY = s.armY;
+  if (s.phase === "boot") {
+    s.phaseT += dt;
+    let moving = false;
+    for (const p of s.prizes) {
+      if (p.vy > 24 || Math.hypot(p.vx, p.vy) > 36 || Math.abs(p.w) > 0.8) moving = true;
+    }
+    if ((s.phaseT > 0.4 && !moving) || s.phaseT > 2.6) {
+      rescuePile(s);
+      s.phase = s.afterBoot;
+      s.phaseT = 0;
+    }
+  } else if (s.phase === "move" && s.holdRight) {
+    s.armX = Math.min(WORLD.maxX, s.armX + WORLD.moveSpeed * dt);
+  } else if (s.phase === "down") {
+    // Fundamental fix: claw stops descending when tips contact a prize
+    // (real crane: claw does not continue through the prize).
+    updateClaw(s);
+    const pose = clawPose(s);
+    let blocked = false;
+    for (const tip of [pose.tipL, pose.tipR]) {
+      for (const p of s.prizes) {
+        const dx = tip.x - p.x;
+        const dy = tip.y - p.y;
+        const rad = p.shape === "circle" ? p.r : Math.min(p.hw, p.hh);
+        // Contact or tip already under the prize
+        if (Math.hypot(dx, dy) < rad + 6 || (Math.abs(dx) < rad * 0.9 && tip.y > p.y - 2)) {
+          blocked = true;
+          break;
+        }
+      }
+      if (blocked) break;
+    }
+    if (!blocked) {
+      // Limit step size so tip cannot jump under a prize in one frame
+      const maxStep = 6;
+      const step = Math.min(WORLD.downSpeed * dt, maxStep);
+      s.armY = Math.min(s.maxDrop, s.armY + step);
+    } else {
+      s.armY = Math.max(WORLD.homeY, s.armY - 14);
+    }
+    s.hooksSolid = true;
+    s.spreadTarget = WORLD.openSpread;
+    if (s.armY >= s.maxDrop - 0.05 || blocked) {
+      s.armY = Math.min(s.armY, s.maxDrop);
+      s.phase = "close";
+      s.phaseT = 0;
+      s.spreadTarget = WORLD.closedSpread;
+      s.hooksSolid = true;
+      pushSfx(s, "close");
+    }
+  } else if (s.phase === "close") {
+    s.phaseT += dt;
+    s.hooksSolid = true;
+    // Prevent tip from staying under a prize during close
+    updateClaw(s);
+    const pose = clawPose(s);
+    for (const tip of [pose.tipL, pose.tipR]) {
+      for (const p of s.prizes) {
+        const dx = tip.x - p.x;
+        const rad = p.shape === "circle" ? p.r : Math.min(p.hw, p.hh);
+        if (Math.abs(dx) < rad * 0.9 && tip.y > p.y - 2) {
+          s.armY = Math.max(WORLD.homeY, s.armY - 16);
+          break;
+        }
+      }
+    }
+    if (s.phaseT >= WORLD.closeSec) {
+      s.spread = WORLD.closedSpread;
+      tryGrab(s);
+      s.phase = "up";
+      s.phaseT = 0;
+      s.dropY = s.armY;
+      setForces(s, 0);
+      pushSfx(s, "motor");
+    }
+  } else if (s.phase === "up") {
+    s.armY = Math.max(WORLD.homeY, s.armY - WORLD.upSpeed * dt);
+    const denom = Math.max(1, s.dropY - WORLD.homeY);
+    const prog = (s.dropY - s.armY) / denom;
+    setForces(s, prog);
+    if (s.armY <= WORLD.homeY + 0.05) {
+      s.armY = WORLD.homeY;
+      s.phase = "return";
+      pushSfx(s, "motor");
+    }
+  } else if (s.phase === "return") {
+    s.armX = Math.max(WORLD.homeX, s.armX - WORLD.returnSpeed * dt);
+    const prog = 1;
+    setForces(s, prog);
+    if (s.armX <= WORLD.homeX + 0.05) {
+      s.armX = WORLD.homeX;
+      s.phase = "open";
+      s.phaseT = 0;
+      s.grip = null;
+      s.gripForce = 0;
+      s.hooksSolid = false;
+      s.spreadTarget = WORLD.openSpread;
+      pushSfx(s, "open");
+    }
+  } else if (s.phase === "open") {
+    s.phaseT += dt;
+    s.hooksSolid = false;
+    s.grip = null;
+    if (s.phaseT >= WORLD.openSec) {
+      s.phase = "wait";
+      s.phaseT = 0;
+      pushSfx(s, "motor-stop");
+    }
+  } else if (s.phase === "wait") {
+    s.phaseT += dt;
+    let moving = false;
+    for (const p of s.prizes) {
+      if (p.vy > 70 || Math.hypot(p.vx, p.vy) > 110) moving = true;
+    }
+    if (s.phaseT > 1.15 || (s.phaseT > 0.4 && !moving)) finishPlay(s);
+  }
+  s.armVx = (s.armX - prevX) / dt;
+  s.armVy = (s.armY - prevY) / dt;
+  const ds = s.spreadTarget - s.spread;
+  const maxDs = 1.55 * dt;
+  s.spread += clamp(ds, -maxDs, maxDs);
+}
+
+function applyGrip(s) {
+  if (!s.grip || s.gripForce <= 0) return;
+  const p = s.prizes.find((q) => q.id === s.grip.id);
+  if (!p) {
+    s.grip = null;
+    return;
+  }
+  const hang = clamp(s.grip.oy, 52, 80);
+  s.grip.ox *= Math.exp(-2.6 * STEP);
+  s.grip.oy += (hang - s.grip.oy) * Math.min(1, 2.4 * STEP);
+  const tx = s.armX + s.grip.ox;
+  const ty = s.armY + s.grip.oy;
+  const dx = tx - p.x;
+  const dy = ty - p.y;
+  let ax = dx * 280 + (s.armVx - p.vx) * 16;
+  let ay = dy * 280 + (s.armVy - p.vy) * 16;
+  const maxA = s.gripForce / p.mass;
+  const mag = Math.hypot(ax, ay) || 1;
+  if (mag > maxA) {
+    ax = (ax / mag) * maxA;
+    ay = (ay / mag) * maxA;
+  }
+  p.vx += ax * STEP;
+  p.vy += ay * STEP;
+  p.w *= Math.exp(-6 * STEP);
+  const pose = clawPose(s);
+  const mouthY = (pose.tipL.y + pose.tipR.y) / 2;
+  if (p.y > mouthY + 30 || Math.hypot(dx, dy) > 64) {
+    s.grip = null;
+  }
+}
+
+function integrate(s) {
+  const damp = Math.exp(-0.45 * STEP);
+  const ang = Math.exp(-2.4 * STEP);
+  for (const p of s.prizes) {
+    p.vy += G * STEP;
+    p.vx *= damp;
+    p.w *= ang;
+  }
+  applyGrip(s);
+  for (const p of s.prizes) {
+    const sp = Math.hypot(p.vx, p.vy);
+    if (sp > 980) {
+      p.vx = (p.vx / sp) * 980;
+      p.vy = (p.vy / sp) * 980;
+    }
+    if (p.w > 14) p.w = 14;
+    if (p.w < -14) p.w = -14;
+    p.x += p.vx * STEP;
+    p.y += p.vy * STEP;
+    p.a += p.w * STEP;
+  }
+}
+
+function boxVerts(b) {
+  const c = Math.cos(b.a);
+  const s = Math.sin(b.a);
+  const pts = [
+    [-b.hw, -b.hh],
+    [b.hw, -b.hh],
+    [b.hw, b.hh],
+    [-b.hw, b.hh],
+  ];
+  return pts.map(([lx, ly]) => ({
+    x: b.x + lx * c - ly * s,
+    y: b.y + lx * s + ly * c,
+  }));
+}
+
+function axesOf(b) {
+  const c = Math.cos(b.a);
+  const s = Math.sin(b.a);
+  return [
+    { x: c, y: s },
+    { x: -s, y: c },
+  ];
+}
+
+function collideCircleCircle(a, b) {
+  let dx = b.x - a.x;
+  let dy = b.y - a.y;
+  const r = a.r + b.r;
+  const d2 = dx * dx + dy * dy;
+  if (d2 === 0) return { nx: 0, ny: -1, pen: r, px: a.x, py: a.y };
+  if (d2 >= r * r) return null;
+  const d = Math.sqrt(d2);
+  const nx = dx / d;
+  const ny = dy / d;
+  return { nx, ny, pen: r - d, px: a.x + nx * a.r, py: a.y + ny * a.r };
+}
+
+function collideCircleBox(circle, box) {
+  const ca = Math.cos(box.a);
+  const sa = Math.sin(box.a);
+  const dx = circle.x - box.x;
+  const dy = circle.y - box.y;
+  const lx = dx * ca + dy * sa;
+  const ly = -dx * sa + dy * ca;
+  const clx = clamp(lx, -box.hw, box.hw);
+  const cly = clamp(ly, -box.hh, box.hh);
+  let lnx;
+  let lny;
+  let pen;
+  let px;
+  let py;
+  if (Math.abs(lx - clx) < 1e-8 && Math.abs(ly - cly) < 1e-8) {
+    const dl = box.hw - lx;
+    const dr = box.hw + lx;
+    const db = box.hh - ly;
+    const dt = box.hh + ly;
+    const min = Math.min(dl, dr, db, dt);
+    if (min === dl) {
+      lnx = 1;
+      lny = 0;
+      pen = dl + circle.r;
+      px = box.hw;
+      py = ly;
+    } else if (min === dr) {
+      lnx = -1;
+      lny = 0;
+      pen = dr + circle.r;
+      px = -box.hw;
+      py = ly;
+    } else if (min === db) {
+      lnx = 0;
+      lny = 1;
+      pen = db + circle.r;
+      px = lx;
+      py = box.hh;
+    } else {
+      lnx = 0;
+      lny = -1;
+      pen = dt + circle.r;
+      px = lx;
+      py = -box.hh;
+    }
+  } else {
+    const ddx = lx - clx;
+    const ddy = ly - cly;
+    const d = Math.hypot(ddx, ddy);
+    if (d >= circle.r) return null;
+    lnx = ddx / (d || 1);
+    lny = ddy / (d || 1);
+    pen = circle.r - d;
+    px = clx;
+    py = cly;
+  }
+  const nx = lnx * ca - lny * sa;
+  const ny = lnx * sa + lny * ca;
+  return {
+    nx,
+    ny,
+    pen,
+    px: box.x + px * ca - py * sa,
+    py: box.y + px * sa + py * ca,
+  };
+}
+
+function pointInBox(v, b) {
+  const ca = Math.cos(b.a);
+  const sa = Math.sin(b.a);
+  const dx = v.x - b.x;
+  const dy = v.y - b.y;
+  const lx = dx * ca + dy * sa;
+  const ly = -dx * sa + dy * ca;
+  return Math.abs(lx) <= b.hw + 0.5 && Math.abs(ly) <= b.hh + 0.5;
+}
+
+function collideBoxBox(a, b) {
+  const axes = axesOf(a).concat(axesOf(b));
+  let minPen = Infinity;
+  let nx = 0;
+  let ny = 0;
+  const va = boxVerts(a);
+  const vb = boxVerts(b);
+  for (const ax of axes) {
+    let aMin = 1e9;
+    let aMax = -1e9;
+    let bMin = 1e9;
+    let bMax = -1e9;
+    for (const v of va) {
+      const p = v.x * ax.x + v.y * ax.y;
+      if (p < aMin) aMin = p;
+      if (p > aMax) aMax = p;
+    }
+    for (const v of vb) {
+      const p = v.x * ax.x + v.y * ax.y;
+      if (p < bMin) bMin = p;
+      if (p > bMax) bMax = p;
+    }
+    const overlap = Math.min(aMax, bMax) - Math.max(aMin, bMin);
+    if (overlap <= 0) return null;
+    if (overlap < minPen) {
+      minPen = overlap;
+      nx = ax.x;
+      ny = ax.y;
+    }
+  }
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if (dx * nx + dy * ny < 0) {
+    nx = -nx;
+    ny = -ny;
+  }
+  let sx = 0;
+  let sy = 0;
+  let n = 0;
+  for (const v of vb) {
+    if (pointInBox(v, a)) {
+      sx += v.x;
+      sy += v.y;
+      n++;
+    }
+  }
+  if (!n) {
+    for (const v of va) {
+      if (pointInBox(v, b)) {
+        sx += v.x;
+        sy += v.y;
+        n++;
+      }
+    }
+  }
+  return { nx, ny, pen: minPen, px: n ? sx / n : (a.x + b.x) / 2, py: n ? sy / n : (a.y + b.y) / 2 };
+}
+
+function collide(a, b) {
+  if (a.shape === "circle" && b.shape === "circle") return collideCircleCircle(a, b);
+  if (a.shape === "circle" && b.shape === "box") {
+    const c = collideCircleBox(a, b);
+    if (!c) return null;
+    return { nx: -c.nx, ny: -c.ny, pen: c.pen, px: c.px, py: c.py };
+  }
+  if (a.shape === "box" && b.shape === "circle") return collideCircleBox(b, a);
+  return collideBoxBox(a, b);
+}
+
+function applyImpulse(a, b, nx, ny, j, rax, ray, rbx, rby) {
+  a.vx -= nx * j * a.invM;
+  a.vy -= ny * j * a.invM;
+  a.w -= (rax * ny - ray * nx) * j * a.invI;
+  b.vx += nx * j * b.invM;
+  b.vy += ny * j * b.invM;
+  b.w += (rbx * ny - rby * nx) * j * b.invI;
+}
+
+function resolve(a, b, c, bounce) {
+  const { nx, ny, pen, px, py } = c;
+  const inv = a.invM + b.invM;
+  const slop = 0.8;
+  const corr = Math.max(pen - slop, 0);
+  if (inv > 0 && corr > 0) {
+    const push = Math.min(corr * 0.72, 8);
+    const sx = (nx * push) / inv;
+    const sy = (ny * push) / inv;
+    a.x -= sx * a.invM;
+    a.y -= sy * a.invM;
+    b.x += sx * b.invM;
+    b.y += sy * b.invM;
+  }
+  const rax = px - a.x;
+  const ray = py - a.y;
+  const rbx = px - b.x;
+  const rby = py - b.y;
+  const avx = a.vx - a.w * ray;
+  const avy = a.vy + a.w * rax;
+  const bvx = b.vx - b.w * rby;
+  const bvy = b.vy + b.w * rbx;
+  const rvx = bvx - avx;
+  const rvy = bvy - avy;
+  const velN = rvx * nx + rvy * ny;
+  const raN = rax * ny - ray * nx;
+  const rbN = rbx * ny - rby * nx;
+  const invN = a.invM + b.invM + raN * raN * a.invI + rbN * rbN * b.invI;
+  if (invN <= 0) return 0;
+  if (velN < 0) {
+    const e = bounce && -velN > 80 ? Math.min(a.restitution, b.restitution) : 0;
+    let j = (-(1 + e) * velN) / invN;
+    if (j < 0) j = 0;
+    applyImpulse(a, b, nx, ny, j, rax, ray, rbx, rby);
+    const avx2 = a.vx - a.w * ray;
+    const avy2 = a.vy + a.w * rax;
+    const bvx2 = b.vx - b.w * rby;
+    const bvy2 = b.vy + b.w * rbx;
+    const tvx = bvx2 - avx2;
+    const tvy = bvy2 - avy2;
+    const tx = -ny;
+    const ty = nx;
+    const velT = tvx * tx + tvy * ty;
+    const raT = rax * ty - ray * tx;
+    const rbT = rbx * ty - rby * tx;
+    const invT = a.invM + b.invM + raT * raT * a.invI + rbT * rbT * b.invI;
+    let jt = invT > 0 ? -velT / invT : 0;
+    const mu = Math.sqrt(Math.max(0, a.friction * b.friction));
+    const maxF = mu * j;
+    jt = clamp(jt, -maxF, maxF);
+    applyImpulse(a, b, tx, ty, jt, rax, ray, rbx, rby);
+    return j;
+  }
+  return 0;
+}
+
+function broad(a, b) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  const r = a.R + b.R;
+  return dx * dx + dy * dy <= r * r;
+}
+
+function softClaw(s) {
+  // Deprecated: soft push replaced by hard kinematic resolution in solveContacts.
+  // Kept as no-op for compatibility.
+}
+
+function solveContacts(s) {
+  const dynamics = s.prizes;
+  const solids = s.walls;
+  const claws = s.claws || [];
+  const grippedId = s.grip ? s.grip.id : null;
+  let maxJ = 0;
+  for (let iter = 0; iter < 10; iter++) {
+    const bounce = iter === 0;
+    // Prize-prize
+    for (let i = 0; i < dynamics.length; i++) {
+      for (let j = i + 1; j < dynamics.length; j++) {
+        const a = dynamics[i];
+        const b = dynamics[j];
+        if (!broad(a, b)) continue;
+        const c = collide(a, b);
+        if (c && c.pen > 0) maxJ = Math.max(maxJ, resolve(a, b, c, bounce));
+      }
+    }
+    // Prize-wall
+    for (const p of dynamics) {
+      for (const w of solids) {
+        if (!broad(p, w)) continue;
+        const c = collide(p, w);
+        if (c && c.pen > 0) maxJ = Math.max(maxJ, resolve(p, w, c, bounce));
+      }
+    }
+    // Prize-claw (kinematic) — penetration fix with gentle mode on descent
+    for (const p of dynamics) {
+      if (p.id === grippedId) continue;
+      for (const claw of claws) {
+        if (claw.hook && !s.hooksSolid) continue;
+        if (!broad(p, claw)) continue;
+        const c = collide(claw, p);
+                if (c && c.pen > 0.2) {
+          const gentle = s.phase === "down" || s.phase === "move" || s.phase === "close";
+          const factor = gentle ? 0.34 : 0.72;
+          const cap = gentle ? 2.8 : 8;
+          // Resolve impulse first
+          maxJ = Math.max(maxJ, resolve(claw, p, c, false));
+          // Then apply limited position correction only if it stays inside
+          if (c.pen > 0.3) {
+            const push = Math.min(c.pen * factor, cap);
+            const trialX = p.x + c.nx * push;
+            const trialY = p.y + c.ny * push;
+            const trial = { ...p, x: trialX, y: trialY };
+            if (!sampleOutside(trial, s.hole)) {
+              p.x = trialX;
+              p.y = trialY;
+            }
+          }
+          // Final safety: if resolve or anything left it outside, pull back to last safe
+          if (sampleOutside(p, s.hole)) {
+            const R = p.shape === "circle" ? p.r : Math.max(p.hw, p.hh);
+            p.x = Math.max(WORLD.innerL + R + 2, Math.min(WORLD.innerR - R - 2, p.x));
+            p.y = Math.max(WORLD.innerT + R + 2, Math.min(WORLD.floorY - R - 2, p.y));
+          }
+        }
+      }
+    }
+  }
+  // Final safety: any prize still outside after claw resolution is pulled back inside.
+  // This addresses residual overshoot that the per-contact reject did not catch.
+  for (const p of dynamics) {
+    if (sampleOutside(p, s.hole)) {
+      const R = p.shape === "circle" ? p.r : Math.max(p.hw, p.hh);
+      p.x = Math.max(WORLD.innerL + R + 2, Math.min(WORLD.innerR - R - 2, p.x));
+      p.y = Math.max(WORLD.innerT + R + 2, Math.min(WORLD.floorY - R - 2, p.y));
+      if (p.vx < 0 && p.x <= WORLD.innerL + R + 3) p.vx = 0;
+      if (p.vx > 0 && p.x >= WORLD.innerR - R - 3) p.vx = 0;
+    }
+  }
+  if (maxJ > 140 && s.thudT <= 0) {
+    pushSfx(s, "thud");
+    s.thudT = 0.08;
+  }
+}
+
+function rescuePile(s) {
+  const rail = s.hole.r + 12;
+  let slot = rail + 28;
+  for (const p of s.prizes) {
+    const half = p.shape === "circle" ? p.r : p.hw;
+    const fallen = p.y > WORLD.floorY - 2 && p.x > s.hole.l - 6 && p.x < s.hole.r + 8;
+    if (fallen || p.x < rail) {
+      p.x = Math.min(WORLD.innerR - half - 4, slot);
+      p.y = Math.min(p.y, WORLD.floorY - half - 4);
+      p.vx = 0;
+      p.vy = 0;
+      p.w = 0;
+      slot += 8;
+    }
+  }
+}
+
+function checkScore(s) {
+  if (s.phase === "boot") return;
+  for (let i = s.prizes.length - 1; i >= 0; i--) {
+    const p = s.prizes[i];
+    if (!crossesHole(p.x, p.y, s.hole)) continue;
+    s.prizes.splice(i, 1);
+    s.caught += 1;
+    s.gotIds.push(p.kind);
+    if (s.grip && s.grip.id === p.id) s.grip = null;
+    pushSfx(s, "get");
+    s.justGot = p.kind;
+  }
+}
+
+function sampleOutside(p, hole) {
+  const { innerL, innerR, innerT, floorY, chuteBottom } = WORLD;
+  const pts =
+    p.shape === "circle"
+      ? [
+          { x: p.x - p.r, y: p.y },
+          { x: p.x + p.r, y: p.y },
+          { x: p.x, y: p.y - p.r },
+          { x: p.x, y: p.y + p.r },
+        ]
+      : boxVerts(p);
+  for (const q of pts) {
+    if (!Number.isFinite(q.x) || !Number.isFinite(q.y)) return true;
+    if (q.x < innerL - 14 || q.x > innerR + 14 || q.y < innerT - 16) return true;
+    if (q.y > chuteBottom + 10) return true;
+    const inShaft = q.x > hole.l - 8 && q.x < hole.r + 8;
+    if (q.y > floorY + 12 && !inShaft) return true;
+  }
+  return false;
+}
+
+function contain(s) {
+  const { innerL, innerR, innerT, floorY, chuteBottom } = WORLD;
+  for (const p of s.prizes) {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.a)) {
+      s.violations += 1;
+      p.x = 180;
+      p.y = 200;
+      p.vx = p.vy = p.w = 0;
+      continue;
+    }
+    if (sampleOutside(p, s.hole)) s.violations += 1;
+    const R = p.shape === "circle" ? p.r : Math.max(p.hw, p.hh);
+    if (p.x < innerL + 4) {
+      p.x = innerL + 4;
+      if (p.vx < 0) p.vx = 0;
+    }
+    if (p.x > innerR - 4) {
+      p.x = innerR - 4;
+      if (p.vx > 0) p.vx = 0;
+    }
+    if (p.y < innerT + 4) {
+      p.y = innerT + 4;
+      if (p.vy < 0) p.vy = 0;
+    }
+    const inHole = p.x > s.hole.l && p.x < s.hole.r;
+    if (!inHole && p.y > floorY - 2) {
+      p.y = Math.min(p.y, floorY - 2);
+      if (p.vy > 0) p.vy = 0;
+    }
+    if (p.y > chuteBottom - 2) {
+      p.y = chuteBottom - 2;
+      if (p.vy > 0) p.vy = 0;
+    }
+    if (R > 80) s.violations += 1;
+  }
+}
+
+function createSession(opts = {}) {
+  const difficulty = DIFF[opts.difficulty] ? opts.difficulty : "normal";
+  const diff = DIFF[difficulty];
+  const seed = opts.seed ?? 1;
+  const rng = opts.rng || mulberry32(seed);
+  const afterBoot = opts.start || "title";
+  const s = {
+    difficulty,
+    diff,
+    rng,
+    seed,
+    hole: { l: diff.holeL, r: diff.holeR, lineY: WORLD.floorY },
+    prizes: [],
+    walls: makeWalls(diff),
+    claws: [makeClawPart(false), makeClawPart(false), makeClawPart(true), makeClawPart(true)],
+    phase: opts.empty ? afterBoot : "boot",
+    afterBoot,
+    phaseT: 0,
+    armX: WORLD.homeX,
+    armY: WORLD.homeY,
+    armVx: 0,
+    armVy: 0,
+    spread: WORLD.openSpread,
+    spreadTarget: WORLD.openSpread,
+    maxDrop: maxDropY(),
+    holdRight: false,
+    rightUsed: false,
+    downUsed: false,
+    playsStarted: 0,
+    caught: 0,
+    gotIds: [],
+    grip: null,
+    gripKind: null,
+    gripForce: 0,
+    hooksSolid: false,
+    dropY: WORLD.homeY,
+    forceKind: opts.forceKind || null,
+    sfx: [],
+    violations: 0,
+    thudT: 0,
+    justGot: null,
+    gripLog: [],
+    t: 0,
+    _planned: false,
+    _aim: 0,
+  };
+  if (!opts.empty) {
+    for (const [kind, x, y] of LAYOUTS[difficulty]) {
+      s.prizes.push(makeDyn(kind, x, y, diff));
+    }
+  }
+  updateClaw(s);
+  return s;
+}
+
+function stepOnce(s) {
+  s.justGot = null;
+  if (s.thudT > 0) s.thudT -= STEP;
+  updateMachine(s);
+  updateClaw(s);
+  if (s.phase !== "over") {
+    integrate(s);
+    solveContacts(s);
+    softClaw(s);
+    checkScore(s);
+    contain(s);
+  } else {
+    integrate(s);
+    solveContacts(s);
+    softClaw(s);
+    checkScore(s);
+    contain(s);
+  }
+  s.t += STEP;
+}
+
+function pointerRight(s, down) {
+  if (s.phase === "over" || s.phase === "title" || s.phase === "boot") return false;
+  if (down) {
+    if (s.phase === "ready" && !s.rightUsed) {
+      s.holdRight = true;
+      s.phase = "move";
+      pushSfx(s, "motor");
+      pushSfx(s, "click");
+      return true;
+    }
+    return false;
+  }
+  if (s.phase === "move") {
+    s.holdRight = false;
+    s.rightUsed = true;
+    s.phase = "ready";
+    pushSfx(s, "motor-stop");
+    return true;
+  }
+  return false;
+}
+
+function pointerDownBtn(s) {
+  if (s.downUsed) return false;
+  if (s.phase !== "ready" && s.phase !== "move") return false;
+  if (s.phase === "move") {
+    s.holdRight = false;
+    s.rightUsed = true;
+    pushSfx(s, "motor-stop");
+  }
+  if (!s.rightUsed) s.rightUsed = true;
+  s.downUsed = true;
+  s.playsStarted += 1;
+  const pity = pityActive(s.playsStarted, s.caught);
+  s.gripKind = s.forceKind || rollGrip(s.rng, pity);
+  s.gripLog.push({ play: s.playsStarted, kind: s.gripKind, pity });
+  s.phase = "down";
+  s.hooksSolid = true;
+  pushSfx(s, "motor");
+  pushSfx(s, "click");
+  return true;
+}
+
+function botStep(s, rng) {
+  if (s.phase !== "ready" || s.downUsed) return;
+  if (!s._planned) {
+    s._planned = true;
+    const roll = rng();
+    const span = WORLD.maxX - WORLD.homeX;
+    s._aim = roll < 0.12 ? WORLD.homeX : WORLD.homeX + 24 + rng() * (span - 24);
+  }
+  if (!s.rightUsed && s._aim > WORLD.homeX + 3) {
+    pointerRight(s, true);
+    return;
+  }
+  if (s.phase === "ready" && !s.downUsed) pointerDownBtn(s);
+}
+
+function botRelease(s) {
+  if (s.phase === "move" && s.armX >= (s._aim || WORLD.maxX) - 0.5) pointerRight(s, false);
+}
+
+function runScriptedGame(opts = {}) {
+  const seed = opts.seed ?? 20260309;
+  const rng = mulberry32(seed ^ 0x9e3779b9);
+  const s = createSession({
+    seed,
+    difficulty: opts.difficulty || "normal",
+    start: "ready",
+    forceKind: opts.forceKind || null,
+    empty: !!opts.empty,
+  });
+  let guard = 0;
+  while (s.phase === "boot" && guard++ < 5000) stepOnce(s);
+  s.violations = 0;
+  const caughtAtBoot = s.caught;
+  s.caught = 0;
+  s.gotIds.length = 0;
+  guard = 0;
+  while (s.phase !== "over" && guard++ < 20000) {
+    botStep(s, rng);
+    stepOnce(s);
+    botRelease(s);
+  }
+  return { session: s, timedOut: s.phase !== "over", caughtAtBoot, guard };
+}
+
+function approx(name, value, target, tol, checks) {
+  const pass = Math.abs(value - target) <= tol;
+  checks.push({
+    name,
+    pass,
+    detail: `${(value * 100).toFixed(1)}%（目標 ${(target * 100).toFixed(1)}% ±${(tol * 100).toFixed(0)}）`,
+  });
+}
+
+function runAllTests() {
+  const checks = [];
+  const ratioRng = mulberry32(20260307);
+  const counts = { strong: 0, normal: 0, weak: 0 };
+  for (let i = 0; i < 1000; i++) counts[rollGrip(ratioRng, false)]++;
+  approx("つかむ力・強 1000回", counts.strong / 1000, 0.2, 0.05, checks);
+  approx("つかむ力・普通 1000回", counts.normal / 1000, 0.55, 0.05, checks);
+  approx("つかむ力・弱 1000回", counts.weak / 1000, 0.25, 0.05, checks);
+
+  const pityRng = mulberry32(20260308);
+  const pc = { strong: 0, normal: 0, weak: 0 };
+  for (let i = 0; i < 1000; i++) pc[rollGrip(pityRng, true)]++;
+  approx("救済・強 1000回", pc.strong / 1000, 0.5, 0.05, checks);
+  approx("救済・普通 1000回", pc.normal / 1000, 0.34375, 0.05, checks);
+  approx("救済・弱 1000回", pc.weak / 1000, 0.15625, 0.05, checks);
+
+  checks.push({
+    name: "救済は10プレイ目かつ獲得0だけ",
+    pass: pityActive(10, 0) && !pityActive(10, 1) && !pityActive(9, 0) && !pityActive(1, 0),
+    detail: "play10/caught0 のみ true",
+  });
+
+  const hole = { l: 48, r: 110, lineY: WORLD.floorY };
+  const caseH =
+    crossesHole(80, WORLD.floorY + 2, hole) &&
+    !crossesHole(80, WORLD.floorY, hole) &&
+    !crossesHole(80, WORLD.floorY - 4, hole) &&
+    !crossesHole(40, WORLD.floorY + 20, hole) &&
+    !crossesHole(120, WORLD.floorY + 20, hole) &&
+    !crossesHole(48, WORLD.floorY + 8, hole) &&
+    !crossesHole(110, WORLD.floorY + 8, hole);
+  checks.push({
+    name: "獲得判定（中心が穴の枠を越えたときだけ）",
+    pass: caseH,
+    detail: "線上・枠上は獲得にしない",
+  });
+
+  const fall = createSession({ seed: 3, difficulty: "normal", empty: true, start: "ready" });
+  fall.prizes = [makeDyn("shumai", 80, 200, fall.diff)];
+  for (let i = 0; i < 180; i++) stepOnce(fall);
+  checks.push({
+    name: "穴の上の景品は落ちて獲得",
+    pass: fall.caught === 1 && fall.prizes.length === 0,
+    detail: `caught=${fall.caught} left=${fall.prizes.length}`,
+  });
+
+  const stay = createSession({ seed: 4, difficulty: "normal", empty: true, start: "ready" });
+  stay.prizes = [makeDyn("brick", 220, 200, stay.diff)];
+  for (let i = 0; i < 180; i++) stepOnce(stay);
+  const rested = stay.prizes[0];
+  checks.push({
+    name: "床の上の景品は獲得にならない",
+    pass: stay.caught === 0 && rested && rested.y > 390 && rested.y < WORLD.floorY && stay.violations === 0,
+    detail: rested ? `y=${rested.y.toFixed(1)} v=${stay.violations}` : "missing",
+  });
+
+  const boot = createSession({ seed: 5, difficulty: "normal", start: "ready" });
+  let g = 0;
+  while (boot.phase === "boot" && g++ < 400) stepOnce(boot);
+  checks.push({
+    name: "開始時に景品が穴へ勝手に落ちない",
+    pass: boot.caught === 0 && boot.prizes.length === 9 && boot.violations === 0,
+    detail: `caught=${boot.caught} n=${boot.prizes.length} out=${boot.violations}`,
+  });
+
+  const speeds = createSession({ seed: 1, difficulty: "normal", empty: true, start: "ready" });
+  speeds.phase = "move";
+  speeds.holdRight = true;
+  const x0 = speeds.armX;
+  for (let i = 0; i < 60; i++) stepOnce(speeds);
+  const moved = speeds.armX - x0;
+  pointerRight(speeds, false);
+  const xLock = speeds.armX;
+  pointerRight(speeds, true);
+  for (let i = 0; i < 30; i++) stepOnce(speeds);
+  checks.push({
+    name: "横移動は毎秒180px・ボタンは1回",
+    pass: Math.abs(moved - 180) < 2.5 && Math.abs(speeds.armX - xLock) < 0.01,
+    detail: `dx=${moved.toFixed(2)} lock=${speeds.armX.toFixed(2)}`,
+  });
+
+  const down = createSession({ seed: 1, difficulty: "normal", empty: true, start: "ready" });
+  pointerDownBtn(down);
+  const y0 = down.armY;
+  for (let i = 0; i < 30; i++) stepOnce(down);
+  const dy = down.armY - y0;
+  checks.push({
+    name: "下降は毎秒220px",
+    pass: Math.abs(dy - 110) < 2.5 && down.playsStarted === 1,
+    detail: `dy=${dy.toFixed(2)} plays=${down.playsStarted}`,
+  });
+
+  function yWhenOpen(kind, prize, difficulty) {
+    const s = createSession({
+      seed: 11,
+      difficulty,
+      empty: true,
+      start: "ready",
+      forceKind: kind,
+    });
+    const spec = CATALOG[prize];
+    const rest = WORLD.floorY - (spec.r || spec.hh) - 0.5;
+    s.prizes = [makeDyn(prize, 230, rest, s.diff)];
+    s._planned = true;
+    s._aim = 230;
+    let yAt = null;
+    let grabbed = false;
+    for (let i = 0; i < 900 && s.phase !== "over"; i++) {
+      botStep(s, mulberry32(1));
+      stepOnce(s);
+      botRelease(s);
+      if (s.grip) grabbed = true;
+      if (yAt == null && s.phase === "open") yAt = s.prizes[0] ? s.prizes[0].y : -1;
+      if (s.phase === "ready" && s.playsStarted > 0) break;
+    }
+    return { yAt, grabbed, caught: s.caught, phase: s.phase, left: s.prizes.length };
+  }
+
+  const liftS = yWhenOpen("strong", "anchor", "normal");
+  checks.push({
+    name: "強は重い景品を上まで保持",
+    pass: liftS.grabbed && liftS.yAt != null && liftS.yAt < 250,
+    detail: `y=${liftS.yAt == null ? "none" : liftS.yAt.toFixed(1)} grabbed=${liftS.grabbed}`,
+  });
+  const liftW = yWhenOpen("weak", "shumai", "normal");
+  checks.push({
+    name: "弱は上がり始めに落とす",
+    pass: liftW.yAt == null || liftW.yAt > 320,
+    detail: `y=${liftW.yAt == null ? "none" : liftW.yAt.toFixed(1)}`,
+  });
+  const liftN = yWhenOpen("normal", "anchor", "normal");
+  checks.push({
+    name: "普通は重い景品が途中で落ちる",
+    pass: liftN.yAt == null || liftN.yAt > 280,
+    detail: `y=${liftN.yAt == null ? "none" : liftN.yAt.toFixed(1)}`,
+  });
+  const liftL = yWhenOpen("normal", "kakigori", "normal");
+  checks.push({
+    name: "普通は軽い景品を出口まで運べる",
+    pass: liftL.grabbed && liftL.yAt != null && liftL.yAt < 280,
+    detail: `y=${liftL.yAt == null ? "none" : liftL.yAt.toFixed(1)} grabbed=${liftL.grabbed}`,
+  });
+
+  const emptyRun = runScriptedGame({ seed: 99, difficulty: "normal", empty: true });
+  const log = emptyRun.session.gripLog;
+  const pityOk = log.length === 10 && log[9].pity === true && log.slice(0, 9).every((e) => !e.pity);
+  checks.push({
+    name: "から箱でも10プレイで終わり、救済は最後だけ",
+    pass: !emptyRun.timedOut && emptyRun.session.phase === "over" && emptyRun.session.playsStarted === 10 && pityOk,
+    detail: `phase=${emptyRun.session.phase} plays=${emptyRun.session.playsStarted} pity10=${log[9] ? log[9].pity : "-"}`,
+  });
+  pointerDownBtn(emptyRun.session);
+  pointerRight(emptyRun.session, true);
+  checks.push({
+    name: "10プレイ後は操作できない",
+    pass: emptyRun.session.playsStarted === 10 && emptyRun.session.phase === "over",
+    detail: `plays=${emptyRun.session.playsStarted}`,
+  });
+
+  let stressPass = true;
+  let stressDetail = "";
+  let totalCaught = 0;
+  for (let n = 0; n < 20; n++) {
+    const diffName = n % 3 === 0 ? "easy" : n % 3 === 1 ? "normal" : "hard";
+    const run = runScriptedGame({ seed: 4000 + n * 17, difficulty: diffName });
+    totalCaught += run.session.caught;
+    if (run.timedOut || run.session.phase !== "over" || run.session.playsStarted !== 10 || run.session.violations > 0 || run.caughtAtBoot > 0) {
+      stressPass = false;
+      stressDetail = `#${n} ${diffName} timeout=${run.timedOut} phase=${run.session.phase} plays=${run.session.playsStarted} out=${run.session.violations} boot=${run.caughtAtBoot}`;
+      break;
+    }
+    for (const p of run.session.prizes) {
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+        stressPass = false;
+        stressDetail = `#${n} NaN`;
+      }
+    }
+  }
+  checks.push({
+    name: "10プレイ×20回、景品は筐体の外へ出ない",
+    pass: stressPass,
+    detail: stressPass ? `獲得合計 ${totalCaught}` : stressDetail,
+  });
+
+  // 1000-contact claw penetration test (added for physics fix)
+  let penCount = 0;
+  let penMax = 0;
+  const penTest = createSession({ seed: 42, difficulty: "normal", empty: true, start: "ready" });
+  penTest.prizes = [
+    makeDyn("shumai", 200, 300, penTest.diff),
+    makeDyn("brick", 230, 280, penTest.diff),
+    makeDyn("anchor", 260, 260, penTest.diff),
+  ];
+  penTest.phase = "down";
+  penTest.hooksSolid = true;
+  for (let step = 0; step < 1000; step++) {
+    penTest.armY = Math.min(penTest.maxDrop, penTest.armY + 8);
+    updateClaw(penTest);
+    stepOnce(penTest);
+    const pose = clawPose(penTest);
+    for (const p of penTest.prizes) {
+      const dx = Math.abs(pose.tipL.x - p.x);
+      const dy = Math.abs(pose.tipL.y - p.y);
+      const rad = p.shape === "circle" ? p.r : Math.min(p.hw, p.hh);
+      if (dx < rad * 0.4 && dy < rad * 0.4) {
+        penCount++;
+        penMax = Math.max(penMax, rad - Math.hypot(dx, dy));
+      }
+    }
+  }
+  checks.push({
+    name: "爪先貫通検査 1000ステップ（内部進入なし）",
+    pass: penCount === 0,
+    detail: `進入回数=${penCount} 最大深度=${penMax.toFixed(1)}px`,
+  });
+
+  const pass = checks.every((c) => c.pass);
+  return { pass, checks };
+}
+
+const canvas = document.getElementById("game");
+const gfx = canvas.getContext("2d");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const testMode = /(?:\?|&)test=1(?:&|$)/.test(location.search);
+
+const ui = {
+  title: document.getElementById("title"),
+  result: document.getElementById("result"),
+  collection: document.getElementById("collection"),
+  remain: document.getElementById("remain"),
+  got: document.getElementById("got"),
+  sound: document.getElementById("sound"),
+  right: document.getElementById("btn-right"),
+  down: document.getElementById("btn-down"),
+  grid: document.getElementById("grid"),
+  test: document.getElementById("test"),
+  verdict: document.getElementById("test-verdict"),
+  testList: document.getElementById("test-list"),
+};
+
+let difficulty = loadDiff();
+let session = null;
+let playsSeen = 0;
+let mode = "title";
+let soundOn = false;
+let timeScale = 1;
+let testAuto = false;
+let testRng = null;
+let getT = 0;
+let shake = 0;
+let confetti = [];
+let audioCtx = null;
+let master = null;
+let noiseBuf = null;
+let motor = null;
+const collection = loadJSON("hamanoko.crane.collection", {});
+const best = loadJSON("hamanoko.crane.best", { easy: 0, normal: 0, hard: 0 });
+
+function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const v = JSON.parse(raw);
+    return v && typeof v === "object" ? v : fallback;
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function saveJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (err) {}
+}
+
+function loadDiff() {
+  try {
+    const v = localStorage.getItem("hamanoko.crane.difficulty");
+    if (v === "easy" || v === "normal" || v === "hard") return v;
+  } catch (err) {}
+  return "normal";
+}
+
+function saveDiff(v) {
+  try {
+    localStorage.setItem("hamanoko.crane.difficulty", v);
+  } catch (err) {}
+}
+
+function addPlays(n) {
+  try {
+    const cur = parseInt(localStorage.getItem("hamanoko.crane.plays") || "0", 10) || 0;
+    localStorage.setItem("hamanoko.crane.plays", String(cur + n));
+  } catch (err) {}
+}
+
+function totalPlays() {
+  try {
+    return parseInt(localStorage.getItem("hamanoko.crane.plays") || "0", 10) || 0;
+  } catch (err) {
+    return 0;
+  }
+}
+
+function paintBest() {
+  document.getElementById("best-easy").textContent = String(best.easy || 0);
+  document.getElementById("best-normal").textContent = String(best.normal || 0);
+  document.getElementById("best-hard").textContent = String(best.hard || 0);
+}
+
+function show(el, on) {
+  el.hidden = !on;
+}
+
+function newSession(start) {
+  const seed = (Date.now() ^ ((Math.random() * 0x100000000) >>> 0)) >>> 0;
+  session = createSession({ difficulty, seed, start });
+  playsSeen = 0;
+  session._recorded = false;
+}
+
+function setDiff(next) {
+  difficulty = next;
+  saveDiff(next);
+  for (const b of document.querySelectorAll(".diffs button")) {
+    b.setAttribute("aria-pressed", b.dataset.diff === next ? "true" : "false");
+  }
+  if (mode === "title") newSession("title");
+}
+
+function startPlay() {
+  mode = "play";
+  show(ui.title, false);
+  show(ui.result, false);
+  show(ui.collection, false);
+  newSession("ready");
+}
+
+function recordEnd() {
+  if (!session || session._recorded || session.phase !== "over") return;
+  session._recorded = true;
+  const n = session.caught;
+  if (n > (best[session.difficulty] || 0)) best[session.difficulty] = n;
+  saveJSON("hamanoko.crane.best", best);
+  paintBest();
+  if (testMode) return;
+  document.getElementById("result-count").textContent = String(n);
+  const hi = best[session.difficulty] || 0;
+  document.getElementById("result-note").textContent = n > 0 && n >= hi ? "獲得。最高記録です" : "獲得。最高 " + hi;
+  show(ui.result, true);
+}
+
+function onGet(kind) {
+  collection[kind] = (collection[kind] || 0) + 1;
+  saveJSON("hamanoko.crane.collection", collection);
+  getT = 1.2;
+  shake = reduceMotion ? 0 : 0.12;
+  const hole = session.hole;
+  burst((hole.l + hole.r) / 2, WORLD.floorY - 8);
+}
+
+function burst(x, y) {
+  const n = reduceMotion ? 10 : 54;
+  const colors = ["#e6c36a", "#d23b45", "#fff6e8", "#1c8c98", "#f2c14e"];
+  for (let i = 0; i < n; i++) {
+    const a = (Math.PI * 2 * i) / n;
+    const sp = 50 + (i % 5) * 26;
+    confetti.push({
+      x, y,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp - 90,
+      life: 1.2,
+      color: colors[i % colors.length],
+      w: 4 + (i % 3),
+      h: 7,
+      rot: a,
+    });
+  }
+}
+
+function unlock() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  if (!audioCtx) {
+    audioCtx = new AC({ latencyHint: "interactive" });
+    master = audioCtx.createGain();
+    master.gain.value = soundOn ? 0.75 : 0;
+    master.connect(audioCtx.destination);
+    const len = audioCtx.sampleRate;
+    noiseBuf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    const data = noiseBuf.getChannelData(0);
+    let s = 12345;
+    for (let i = 0; i < len; i++) {
+      s = (s * 16807) % 2147483647;
+      data[i] = (s / 2147483647) * 2 - 1;
+    }
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function setSound(on) {
+  soundOn = on;
+  ui.sound.setAttribute("aria-pressed", on ? "true" : "false");
+  ui.sound.textContent = on ? "音ON" : "音OFF";
+  if (master && audioCtx) master.gain.setTargetAtTime(on ? 0.75 : 0, audioCtx.currentTime, 0.02);
+}
+
+function tone(freq, dur, type, gain) {
+  if (!audioCtx || !soundOn) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0001, gain), t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g);
+  g.connect(master);
+  o.start(t);
+  o.stop(t + dur + 0.02);
+  o.onended = () => { o.disconnect(); g.disconnect(); };
+}
+
+function noise(dur, gain, freq) {
+  if (!audioCtx || !soundOn || !noiseBuf) return;
+  const t = audioCtx.currentTime;
+  const src = audioCtx.createBufferSource();
+  src.buffer = noiseBuf;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.value = freq;
+  filter.Q.value = 0.8;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(gain, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(filter);
+  filter.connect(g);
+  g.connect(master);
+  src.start(t);
+  src.stop(t + dur);
+  src.onended = () => { src.disconnect(); filter.disconnect(); g.disconnect(); };
+}
+
+function startMotor() {
+  if (!audioCtx || !soundOn || motor) return;
+  const src = audioCtx.createBufferSource();
+  src.buffer = noiseBuf;
+  src.loop = true;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.value = 140;
+  filter.Q.value = 4;
+  const osc = audioCtx.createOscillator();
+  osc.type = "square";
+  osc.frequency.value = 72;
+  const g = audioCtx.createGain();
+  g.gain.value = 0.0001;
+  g.gain.setTargetAtTime(0.045, audioCtx.currentTime, 0.03);
+  const og = audioCtx.createGain();
+  og.gain.value = 0.018;
+  src.connect(filter);
+  filter.connect(g);
+  osc.connect(og);
+  og.connect(g);
+  g.connect(master);
+  src.start();
+  osc.start();
+  motor = { src, osc, filter, g, og };
+}
+
+function stopMotor() {
+  if (!motor || !audioCtx) return;
+  const m = motor;
+  motor = null;
+  m.g.gain.setTargetAtTime(0.0001, audioCtx.currentTime, 0.02);
+  const stopAt = audioCtx.currentTime + 0.06;
+  try { m.src.stop(stopAt); m.osc.stop(stopAt); } catch (err) {}
+  m.src.onended = () => {
+    m.src.disconnect();
+    m.osc.disconnect();
+    m.filter.disconnect();
+    m.g.disconnect();
+    m.og.disconnect();
+  };
+}
+
+function playSfx(name) {
+  if (name === "motor") startMotor();
+  else if (name === "motor-stop") stopMotor();
+  else if (name === "click") tone(720, 0.04, "square", 0.035);
+  else if (name === "close") { noise(0.11, 0.1, 880); tone(230, 0.09, "square", 0.04); }
+  else if (name === "open") tone(170, 0.08, "triangle", 0.045);
+  else if (name === "thud") { noise(0.07, 0.09, 200); tone(100, 0.08, "sine", 0.07); }
+  else if (name === "get") {
+    [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.15, "triangle", 0.06), i * 80));
+  }
+}
+
+function face(c, x, y) {
+  c.fillStyle = "#1b2430";
+  c.beginPath();
+  c.arc(x - 4, y - 1, 1.4, 0, Math.PI * 2);
+  c.arc(x + 4, y - 1, 1.4, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = "#1b2430";
+  c.lineWidth = 1;
+  c.beginPath();
+  c.arc(x, y + 2, 3, 0.15 * Math.PI, 0.85 * Math.PI);
+  c.stroke();
+}
+
+function drawKind(c, kind) {
+  if (kind === "shumai") {
+    c.fillStyle = "#f0b429";
+    c.beginPath();
+    c.arc(0, 2, 20, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = "#ffe7a8";
+    c.beginPath();
+    c.arc(0, -4, 14, Math.PI, 0);
+    c.fill();
+    c.strokeStyle = "#c4841d";
+    c.lineWidth = 1.2;
+    for (let i = -2; i <= 2; i++) {
+      c.beginPath();
+      c.moveTo(i * 4, -16);
+      c.lineTo(i * 3, -4);
+      c.stroke();
+    }
+    c.fillStyle = "#5f8f45";
+    c.beginPath();
+    c.arc(-5, -6, 2.2, 0, Math.PI * 2);
+    c.arc(4, -8, 1.8, 0, Math.PI * 2);
+    c.fill();
+    face(c, 0, 6);
+  } else if (kind === "kamome") {
+    c.fillStyle = "#f7f4ee";
+    c.beginPath();
+    c.arc(0, 0, 18, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = "#d5e2ea";
+    c.beginPath();
+    c.ellipse(-11, 2, 9, 5.5, -0.5, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = "#e2b340";
+    c.beginPath();
+    c.moveTo(8, 2);
+    c.lineTo(20, 6);
+    c.lineTo(8, 9);
+    c.fill();
+    face(c, -1, 1);
+  } else if (kind === "lantern") {
+    c.fillStyle = "#e24b4b";
+    c.beginPath();
+    c.arc(0, 0, 19, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = "#f0d78c";
+    c.fillRect(-16, -8, 32, 3);
+    c.fillRect(-16, 6, 32, 3);
+    c.strokeStyle = "#f0d78c";
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(0, 16);
+    c.lineTo(0, 23);
+    c.stroke();
+    face(c, 0, 0);
+  } else if (kind === "kakigori") {
+    c.fillStyle = "#8fd6e2";
+    c.beginPath();
+    c.arc(0, -2, 16, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = "#e86b8a";
+    c.beginPath();
+    c.ellipse(0, -2, 6, 11, 0.4, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = "#fff6e8";
+    c.beginPath();
+    c.roundRect(-13, 6, 26, 11, 4);
+    c.fill();
+    face(c, 0, -4);
+  } else if (kind === "brick") {
+    c.fillStyle = "#c4513a";
+    c.beginPath();
+    c.roundRect(-22, -18, 44, 36, 4);
+    c.fill();
+    c.strokeStyle = "#f3e4d6";
+    c.lineWidth = 1;
+    c.strokeRect(-22, -6, 44, 12);
+    c.beginPath();
+    c.moveTo(0, -18);
+    c.lineTo(0, -6);
+    c.moveTo(-11, 6);
+    c.lineTo(-11, 18);
+    c.moveTo(11, 6);
+    c.lineTo(11, 18);
+    c.stroke();
+    c.fillStyle = "#8fd0dc";
+    c.fillRect(-14, -14, 8, 6);
+    c.fillRect(6, -14, 8, 6);
+  } else if (kind === "wheel") {
+    c.fillStyle = "#ef8f3a";
+    c.beginPath();
+    c.roundRect(-24, -20, 48, 40, 4);
+    c.fill();
+    c.strokeStyle = "#fff6e8";
+    c.lineWidth = 1.6;
+    c.beginPath();
+    c.arc(0, 0, 11, 0, Math.PI * 2);
+    c.moveTo(-11, 0);
+    c.lineTo(11, 0);
+    c.moveTo(0, -11);
+    c.lineTo(0, 11);
+    c.stroke();
+    c.fillStyle = "#d23b45";
+    for (const a of [0, 1.6, 3.2, 4.7]) {
+      c.beginPath();
+      c.arc(Math.cos(a) * 11, Math.sin(a) * 11, 2, 0, Math.PI * 2);
+      c.fill();
+    }
+  } else if (kind === "bridge") {
+    c.fillStyle = "#3e7d93";
+    c.beginPath();
+    c.roundRect(-21, -17, 42, 34, 4);
+    c.fill();
+    c.strokeStyle = "#fff6e8";
+    c.lineWidth = 1.6;
+    c.beginPath();
+    c.moveTo(-14, 8);
+    c.lineTo(-14, -2);
+    c.quadraticCurveTo(0, -12, 14, -2);
+    c.lineTo(14, 8);
+    c.moveTo(-14, -2);
+    c.lineTo(-8, -8);
+    c.moveTo(14, -2);
+    c.lineTo(8, -8);
+    c.stroke();
+  } else if (kind === "tug") {
+    c.fillStyle = "#1f6f86";
+    c.beginPath();
+    c.roundRect(-38, -8, 76, 20, 8);
+    c.fill();
+    c.fillStyle = "#d23b45";
+    c.fillRect(-38, 6, 76, 4);
+    c.fillStyle = "#fff6e8";
+    c.beginPath();
+    c.roundRect(-8, -18, 22, 14, 3);
+    c.fill();
+    c.fillStyle = "#e6c36a";
+    c.fillRect(16, -16, 6, 10);
+    face(c, -30, 0);
+  } else if (kind === "anchor") {
+    c.fillStyle = "#2c3e50";
+    c.beginPath();
+    c.roundRect(-32, -10, 64, 22, 8);
+    c.fill();
+    c.strokeStyle = "#e6c36a";
+    c.lineWidth = 2;
+    c.beginPath();
+    c.arc(0, -2, 5, 0, Math.PI * 2);
+    c.moveTo(0, 3);
+    c.lineTo(0, 8);
+    c.moveTo(-12, 4);
+    c.quadraticCurveTo(-16, 10, -8, 8);
+    c.moveTo(12, 4);
+    c.quadraticCurveTo(16, 10, 8, 8);
+    c.stroke();
+    face(c, -18, -1);
+  }
+}
+
+function drawPrize(c, p) {
+  c.save();
+  c.translate(p.x, p.y + 8);
+  c.fillStyle = "rgba(0,0,0,0.18)";
+  c.beginPath();
+  c.ellipse(0, (p.r || p.hh) - 4, (p.r || p.hw) * 0.65, 3.5, 0, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+  c.save();
+  c.translate(p.x, p.y);
+  c.rotate(p.a);
+  drawKind(c, p.kind);
+  c.restore();
+}
+
+function drawCabinet(c) {
+  c.beginPath();
+  c.roundRect(8, 8, 344, 504, 18);
+  c.fillStyle = "#b42332";
+  c.fill();
+  c.lineWidth = 4;
+  c.strokeStyle = "#e6c36a";
+  c.stroke();
+  c.beginPath();
+  c.roundRect(18, 16, 324, 54, 10);
+  c.fillStyle = "#10243a";
+  c.fill();
+  c.fillStyle = "#fff6e8";
+  c.font = "700 22px 'Hiragino Maru Gothic ProN', 'Yu Gothic', Meiryo, sans-serif";
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.fillText("ハマのクレーン", 180, 44);
+  c.fillStyle = "#e6c36a";
+  for (let i = 0; i < 12; i++) {
+    c.beginPath();
+    c.arc(36 + i * 26, 24, 2.2, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.beginPath();
+  c.roundRect(WORLD.innerL, WORLD.innerT - 6, WORLD.innerR - WORLD.innerL, WORLD.floorY - WORLD.innerT + 10, 6);
+  const glass = c.createLinearGradient(0, 80, 0, 450);
+  glass.addColorStop(0, "#1c4d6b");
+  glass.addColorStop(1, "#12344c");
+  c.fillStyle = glass;
+  c.fill();
+  const hole = session.hole;
+  c.fillStyle = "#071018";
+  c.beginPath();
+  c.moveTo(hole.l, WORLD.floorY);
+  c.lineTo(hole.r, WORLD.floorY);
+  c.lineTo(hole.r - 6, WORLD.chuteBottom);
+  c.lineTo(hole.l + 6, WORLD.chuteBottom);
+  c.closePath();
+  c.fill();
+  c.fillStyle = "#e6c36a";
+  c.font = "700 11px 'Hiragino Maru Gothic ProN', 'Yu Gothic', Meiryo, sans-serif";
+  c.fillText("出口", (hole.l + hole.r) / 2, WORLD.floorY + 28);
+  c.fillStyle = "#c9a36a";
+  c.fillRect(WORLD.innerL, WORLD.floorY - 8, Math.max(0, hole.l - WORLD.innerL), 16);
+  c.fillRect(hole.r, WORLD.floorY - 8, Math.max(0, WORLD.innerR - hole.r), 16);
+  c.fillStyle = "#8d6438";
+  for (let x = WORLD.innerL; x < WORLD.innerR; x += 18) {
+    if (x > hole.l - 10 && x < hole.r + 4) continue;
+    c.fillRect(x, WORLD.floorY - 8, 2, 16);
+  }
+  c.fillStyle = "#ead8b0";
+  c.fillRect(hole.l - 8, WORLD.floorY - 18, 8, 18);
+  c.fillRect(hole.r, WORLD.floorY - 18, 8, 18);
+  c.beginPath();
+  c.roundRect(46, 96, 268, 8, 4);
+  c.fillStyle = "#d7e2ea";
+  c.fill();
+  c.fillStyle = "#8ea0ae";
+  c.fillRect(session.armX - 16, 92, 32, 14);
+}
+
+function drawClaw(c) {
+  const pose = clawPose(session);
+  c.strokeStyle = "#9fb0be";
+  c.lineWidth = 2;
+  c.lineCap = "round";
+  c.beginPath();
+  c.moveTo(session.armX, 106);
+  c.lineTo(pose.hubX, pose.hubY);
+  c.stroke();
+  c.strokeStyle = "#d5dde6";
+  c.lineWidth = 8;
+  c.beginPath();
+  const bL = {
+    x: session.armX + Math.sin(-session.spread) * 16,
+    y: session.armY + Math.cos(session.spread) * 16,
+  };
+  const bR = {
+    x: session.armX + Math.sin(session.spread) * 16,
+    y: session.armY + Math.cos(session.spread) * 16,
+  };
+  c.moveTo(bL.x, bL.y);
+  c.lineTo(pose.tipL.x, pose.tipL.y);
+  c.moveTo(bR.x, bR.y);
+  c.lineTo(pose.tipR.x, pose.tipR.y);
+  c.stroke();
+  c.strokeStyle = "#e6c36a";
+  c.lineWidth = 6;
+  c.beginPath();
+  c.moveTo(pose.tipL.x, pose.tipL.y);
+  c.lineTo(pose.tipL.x + 16, pose.tipL.y - 3);
+  c.moveTo(pose.tipR.x, pose.tipR.y);
+  c.lineTo(pose.tipR.x - 16, pose.tipR.y - 3);
+  c.stroke();
+  c.fillStyle = "#9e2430";
+  c.beginPath();
+  c.arc(pose.hubX, pose.hubY, 9, 0, Math.PI * 2);
+  c.fill();
+  c.lineWidth = 3;
+  c.strokeStyle = "#e6c36a";
+  c.stroke();
+}
+
+function drawFx(c, dt) {
+  for (let i = confetti.length - 1; i >= 0; i--) {
+    const p = confetti[i];
+    p.life -= dt;
+    p.vy += 260 * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.rot += dt * 2;
+    if (p.life <= 0) {
+      confetti.splice(i, 1);
+      continue;
+    }
+    c.save();
+    c.globalAlpha = Math.max(0, p.life / 1.2);
+    c.translate(p.x, p.y);
+    c.rotate(p.rot);
+    c.fillStyle = p.color;
+    c.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    c.restore();
+  }
+  if (getT > 0) {
+    const k = 1 - getT / 1.2;
+    const pop = Math.min(1, k / 0.2);
+    const s = 0.84 + 0.16 * (1 - Math.pow(1 - pop, 3));
+    c.save();
+    c.translate(180, 240);
+    c.scale(s, s);
+    c.globalAlpha = getT < 0.28 ? Math.max(0, getT / 0.28) : 1;
+    c.lineWidth = 6;
+    c.font = "900 40px 'Hiragino Maru Gothic ProN', 'Yu Gothic', Meiryo, sans-serif";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.strokeStyle = "#9e2430";
+    c.fillStyle = "#fff6e8";
+    c.strokeText("ゲット！", 0, 0);
+    c.fillText("ゲット！", 0, 0);
+    c.restore();
+  }
+}
+
+function fit() {
+  const rect = document.getElementById("stage").getBoundingClientRect();
+  const scale = Math.min(rect.width / 360, rect.height / 520);
+  const cssW = Math.max(1, Math.floor(360 * scale));
+  const cssH = Math.max(1, Math.floor(520 * scale));
+  canvas.style.width = cssW + "px";
+  canvas.style.height = cssH + "px";
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const bw = Math.max(1, Math.floor(cssW * dpr));
+  const bh = Math.max(1, Math.floor(cssH * dpr));
+  if (canvas.width !== bw || canvas.height !== bh) {
+    canvas.width = bw;
+    canvas.height = bh;
+  }
+  gfx.setTransform((cssW / 360) * dpr, 0, 0, (cssH / 520) * dpr, 0, 0);
+}
+
+function render(dt) {
+  if (!session) return;
+  fit();
+  const c = gfx;
+  c.clearRect(0, 0, 360, 520);
+  const jx = reduceMotion ? 0 : Math.sin(shake * 70) * shake * 16;
+  c.save();
+  c.translate(jx, 0);
+  drawCabinet(c);
+  const held = session.grip ? session.grip.id : null;
+  for (const p of session.prizes) if (p.id !== held) drawPrize(c, p);
+  drawClaw(c);
+  if (held) {
+    const p = session.prizes.find((q) => q.id === held);
+    if (p) drawPrize(c, p);
+  }
+  drawFx(c, dt);
+  c.restore();
+}
+
+function hud() {
+  const left = Math.max(0, WORLD.plays - session.playsStarted);
+  ui.remain.textContent = "のこり " + left;
+  ui.got.textContent = "獲得 " + session.caught;
+  const rightOn = (session.phase === "ready" && !session.rightUsed) || session.phase === "move";
+  const downOn = !session.downUsed && (session.phase === "ready" || session.phase === "move");
+  ui.right.classList.toggle("used", !rightOn);
+  ui.down.classList.toggle("used", !downOn);
+  ui.right.classList.toggle("held", session.phase === "move");
+  ui.right.setAttribute("aria-disabled", rightOn ? "false" : "true");
+  ui.down.setAttribute("aria-disabled", downOn ? "false" : "true");
+}
+
+function buildGrid() {
+  ui.grid.replaceChildren();
+  for (const kind of KIND_ORDER) {
+    const n = collection[kind] || 0;
+    const cell = document.createElement("div");
+    cell.className = "cell" + (n ? "" : " off");
+    const mini = document.createElement("canvas");
+    mini.width = 64;
+    mini.height = 64;
+    const g = mini.getContext("2d");
+    g.setTransform(1.1, 0, 0, 1.1, 32, 34);
+    drawKind(g, kind);
+    const name = document.createElement("b");
+    name.textContent = CATALOG[kind].name;
+    const count = document.createElement("span");
+    count.textContent = "×" + n;
+    cell.append(mini, name, count);
+    ui.grid.appendChild(cell);
+  }
+  document.getElementById("play-total").textContent = "あそんだ回数 " + totalPlays();
+}
+
+function openCollection() {
+  buildGrid();
+  show(ui.collection, true);
+}
+
+function bindPress(btn, down, up) {
+  btn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    try { btn.setPointerCapture(e.pointerId); } catch (err) {}
+    unlock();
+    down();
+  });
+  const end = () => up && up();
+  btn.addEventListener("pointerup", end);
+  btn.addEventListener("pointercancel", end);
+}
+
+ui.sound.addEventListener("click", () => {
+  unlock();
+  setSound(!soundOn);
+});
+
+for (const b of document.querySelectorAll(".diffs button")) {
+  b.addEventListener("click", () => {
+    unlock();
+    setDiff(b.dataset.diff);
+  });
+}
+
+document.getElementById("play-btn").addEventListener("click", () => { unlock(); startPlay(); });
+document.getElementById("again").addEventListener("click", () => { unlock(); startPlay(); });
+document.getElementById("open-col").addEventListener("click", () => { unlock(); openCollection(); });
+document.getElementById("result-col").addEventListener("click", () => { unlock(); openCollection(); });
+document.getElementById("close-col").addEventListener("click", () => show(ui.collection, false));
+document.getElementById("back-title").addEventListener("click", () => {
+  mode = "title";
+  show(ui.result, false);
+  show(ui.collection, false);
+  show(ui.title, true);
+  newSession("title");
+});
+
+bindPress(ui.right, () => pointerRight(session, true), () => pointerRight(session, false));
+bindPress(ui.down, () => pointerDownBtn(session));
+
+window.addEventListener("keydown", (e) => {
+  if (e.repeat) return;
+  if (e.key === "ArrowRight") { e.preventDefault(); unlock(); pointerRight(session, true); }
+  if (e.key === "ArrowDown") { e.preventDefault(); unlock(); pointerDownBtn(session); }
+});
+window.addEventListener("keyup", (e) => {
+  if (e.key === "ArrowRight") pointerRight(session, false);
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && audioCtx && audioCtx.state === "suspended" && soundOn) {
+    audioCtx.resume();
+  }
+});
+
+function stepSide(dt) {
+  if (session.playsStarted !== playsSeen) {
+    addPlays(session.playsStarted - playsSeen);
+    playsSeen = session.playsStarted;
+  }
+  if (session.justGot) onGet(session.justGot);
+  while (session.sfx.length) playSfx(session.sfx.shift());
+  recordEnd();
+  hud();
+}
+
+let last = performance.now();
+let acc = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  acc += dt * timeScale;
+  let guard = 0;
+  while (session && acc >= STEP && guard++ < 24) {
+    if (testAuto) botStep(session, testRng);
+    stepOnce(session);
+    if (testAuto) botRelease(session);
+    stepSide(STEP);
+    acc -= STEP;
+  }
+  render(dt);
+  if (getT > 0) getT = Math.max(0, getT - dt);
+  if (shake > 0) shake = Math.max(0, shake - dt);
+  requestAnimationFrame(frame);
+}
+
+function bootTitle() {
+  for (const b of document.querySelectorAll(".diffs button")) {
+    b.setAttribute("aria-pressed", b.dataset.diff === difficulty ? "true" : "false");
+  }
+  paintBest();
+  setSound(false);
+  newSession("title");
+  requestAnimationFrame(frame);
+}
+
+function runVisibleTests() {
+  ui.test.hidden = false;
+  ui.verdict.textContent = "テスト中";
+  ui.verdict.className = "";
+  requestAnimationFrame(() => {
+    const t0 = performance.now();
+    const result = runAllTests();
+    const ms = Math.round(performance.now() - t0);
+    ui.verdict.textContent = result.pass ? "PASS" : "FAIL";
+    ui.verdict.className = result.pass ? "pass" : "fail";
+    ui.testList.replaceChildren();
+    for (const c of result.checks) {
+      const li = document.createElement("li");
+      li.textContent = (c.pass ? "PASS " : "FAIL ") + c.name + " — " + c.detail;
+      ui.testList.appendChild(li);
+    }
+    const done = document.createElement("li");
+    done.textContent = "自動判定 " + ms + "ms。このあと見本の自動プレイが動きます。";
+    ui.testList.appendChild(done);
+    testAuto = true;
+    testRng = mulberry32(20260309);
+    timeScale = 6;
+    mode = "play";
+    show(ui.title, false);
+    session = createSession({ difficulty: "normal", seed: 20260309, start: "ready" });
+    playsSeen = 0;
+  });
+}
+
+if (testMode) {
+  show(ui.title, false);
+  bootTitle();
+  runVisibleTests();
+} else {
+  bootTitle();
+}
+
+</script>
+</body>
+</html>
