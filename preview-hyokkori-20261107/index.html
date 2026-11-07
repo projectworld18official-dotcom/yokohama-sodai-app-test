@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="非公開検証用。ひょっこりタップ盤面修正のプレビューです。">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#102820">
+<meta name="description" content="穴からひょっこり出る生きものを、30秒でたくさんタップするゲーム。">
+<title>ひょっこりタップ</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='18' r='10' fill='%23ffd7b8'/%3E%3Ccircle cx='12.5' cy='17' r='1.6' fill='%23243028'/%3E%3Ccircle cx='19.5' cy='17' r='1.6' fill='%23243028'/%3E%3Cpath d='M12 21q4 3 8 0' stroke='%23243028' stroke-width='1.4' fill='none'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #102820;
+    --bg-2: #184233;
+    --cream: #f6f1e4;
+    --ink: #1a140f;
+    --coral: #ff6b4a;
+    --moss: #2f7a46;
+    --moss-2: #24643c;
+    --wood: #e7c98a;
+    --wood-2: #8a5a28;
+    --gold: #ffc83d;
+    --pit: #0c1612;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    background:
+      radial-gradient(ellipse at 50% -8%, #1d6244 0%, transparent 52%),
+      var(--bg);
+    color: var(--cream);
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", YuGothic, Meiryo, sans-serif;
+    overflow: hidden;
+    touch-action: none;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  button, a { font: inherit; }
+  button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  .app {
+    width: min(480px, 100%);
+    height: 100dvh;
+    max-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    padding:
+      env(safe-area-inset-top)
+      env(safe-area-inset-right)
+      env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
+
+  header {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+    min-height: 48px;
+    padding: 2px 6px 0;
+    z-index: 5;
+  }
+  .back {
+    justify-self: start;
+    color: var(--cream);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-size: 12px;
+    line-height: 1.25;
+    min-height: 44px;
+    max-width: 9.2em;
+    display: flex;
+    align-items: center;
+  }
+  .time {
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    font-size: 28px;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    min-width: 4.2ch;
+    text-align: center;
+  }
+  .right {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .score {
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    font-size: 22px;
+    min-width: 1.6ch;
+    text-align: right;
+    padding-right: 2px;
+  }
+  #sound {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 4px 6px;
+    border-radius: 12px;
+    border: 1px solid rgba(246, 241, 228, 0.35);
+    background: transparent;
+    color: var(--cream);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    line-height: 1;
+  }
+  #sound .snd-tx { font-size: 10px; font-weight: 700; }
+  #sound .wave { display: none; }
+  #sound.is-on .wave { display: block; }
+  #sound.is-on .mute-x { display: none; }
+
+  .stage {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .combo {
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+    pointer-events: none;
+    background: rgba(16, 40, 32, 0.88);
+    color: var(--cream);
+    border: 2px solid var(--coral);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: 0.04em;
+  }
+  .combo.hot {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  .board {
+    width: min(460px, calc(100% - 6px));
+    aspect-ratio: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    padding: 0;
+    margin: 0;
+    background: linear-gradient(180deg, #358754, var(--moss-2));
+    border-radius: 26px;
+    box-shadow:
+      0 0 0 3px var(--wood),
+      0 0 0 6px var(--wood-2),
+      0 14px 28px rgba(0, 0, 0, 0.28);
+    position: relative;
+    z-index: 1;
+  }
+  .board.locked { pointer-events: none; }
+  .hole {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 18px;
+    background: transparent;
+    color: inherit;
+    overflow: visible;
+  }
+  .hole.up { z-index: 2; }
+  .pit {
+    position: absolute;
+    inset: 10%;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 42%, #1c3330 0 18%, var(--pit) 58%, #d9b56a 66%, var(--wood-2) 74%, #2f7a46 75%);
+    box-shadow: inset 0 8px 10px rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+  }
+  .critter {
+    position: absolute;
+    left: 50%;
+    bottom: 6%;
+    width: 92%;
+    height: 92%;
+    transform: translate(-50%, 72%) scale(0.3);
+    transform-origin: 50% 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .hole.up .critter {
+    animation: pop 0.12s cubic-bezier(0.2, 1.45, 0.36, 1) forwards;
+  }
+  .hole.up.settled .critter {
+    animation: bob 0.8s ease-in-out infinite;
+  }
+  .hole.g .critter {
+    filter: drop-shadow(0 0 5px rgba(255, 214, 90, 0.95)) drop-shadow(0 0 12px rgba(255, 180, 40, 0.65));
+  }
+  .hole.squash .critter { animation: squash 0.2s ease-in forwards; }
+  .hole.down .critter { animation: retreat 0.1s ease-in forwards; }
+  .hole.miss .pit { animation: dip 0.15s ease-out; }
+  @keyframes pop {
+    from { transform: translate(-50%, 70%) scale(0.32); }
+    to { transform: translate(-50%, 0) scale(1); }
+  }
+  @keyframes bob {
+    0%, 100% { transform: translate(-50%, 0) scale(1); }
+    50% { transform: translate(-50%, -3%) scale(1.03, 0.97); }
+  }
+  @keyframes squash {
+    0% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+    45% { transform: translate(-50%, 12%) scale(1.3, 0.38); opacity: 1; }
+    100% { transform: translate(-50%, 28%) scale(0.55, 0.16); opacity: 0; }
+  }
+  @keyframes retreat {
+    from { transform: translate(-50%, 0) scale(1); opacity: 1; }
+    to { transform: translate(-50%, 64%) scale(0.7); opacity: 0; }
+  }
+  @keyframes dip {
+    0% { transform: scale(1); }
+    40% { transform: scale(0.94); }
+    100% { transform: scale(1); }
+  }
+  .fx { position: absolute; inset: 0; pointer-events: none; z-index: 4; overflow: visible; }
+  .spark {
+    position: absolute;
+    left: 50%;
+    top: 42%;
+    width: 11px;
+    height: 11px;
+    margin: -5px 0 0 -5px;
+    background: var(--gold);
+    clip-path: polygon(50% 0%, 62% 36%, 100% 36%, 68% 56%, 80% 94%, 50% 70%, 20% 94%, 32% 56%, 0% 36%, 38% 36%);
+    animation: burst 0.2s ease-out forwards;
+  }
+  .spark.n { background: #ffe08a; }
+  .spark.s { background: #ffd0c6; }
+  @keyframes burst {
+    to { transform: translate(var(--dx), var(--dy)) scale(0.4); opacity: 0; }
+  }
+  .floater {
+    position: absolute;
+    left: 50%;
+    top: 8%;
+    z-index: 5;
+    transform: translateX(-50%);
+    font-weight: 800;
+    font-size: 18px;
+    color: var(--cream);
+    text-shadow: 0 1px 0 #102820;
+    pointer-events: none;
+    animation: rise 0.45s ease-out forwards;
+  }
+  .floater.g { color: var(--gold); }
+  .floater.s { color: #ffb2a4; }
+  @keyframes rise {
+    to { transform: translate(-50%, -26px); opacity: 0; }
+  }
+
+  .card {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    background: rgba(8, 22, 18, 0.42);
+  }
+  #card-count { background: transparent; pointer-events: none; }
+  .panel {
+    width: min(100%, 360px);
+    max-height: 100%;
+    overflow: auto;
+    background: rgba(12, 32, 26, 0.94);
+    border: 2px solid rgba(231, 201, 138, 0.85);
+    border-radius: 20px;
+    padding: 12px 14px 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  }
+  h1 {
+    margin: 0;
+    text-align: center;
+    font-size: 26px;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+  }
+  .flavor {
+    margin: 2px 0 8px;
+    text-align: center;
+    font-size: 12px;
+    color: #d5ecdf;
+  }
+  #how {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  #how li { margin: 0; }
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 8px 0 4px;
+  }
+  .legend figure {
+    margin: 0;
+    width: 72px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .legend .mini {
+    height: 52px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .legend .mini svg { width: 48px; height: 48px; }
+  .legend .g svg { filter: drop-shadow(0 0 4px rgba(255, 200, 60, 0.9)); }
+  .bests {
+    margin: 6px 0 8px;
+    text-align: center;
+    font-size: 12px;
+    color: #d7ecdf;
+    line-height: 1.4;
+  }
+  .diffs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .diffs button {
+    min-height: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(246, 241, 228, 0.35);
+    background: transparent;
+    color: var(--cream);
+    font-weight: 700;
+    font-size: 14px;
+    padding: 6px 2px;
+  }
+  .diffs button[aria-pressed="true"] {
+    background: var(--coral);
+    color: var(--ink);
+    border-color: var(--coral);
+  }
+  .go, .again {
+    width: 100%;
+    min-height: 48px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--coral);
+    color: var(--ink);
+    font-weight: 800;
+    font-size: 18px;
+  }
+  .again { margin-bottom: 8px; }
+  .ghost {
+    width: 100%;
+    min-height: 48px;
+    border-radius: 14px;
+    border: 1px solid rgba(246, 241, 228, 0.45);
+    background: transparent;
+    color: var(--cream);
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .countnum {
+    font-size: clamp(88px, 24vw, 140px);
+    font-weight: 800;
+    line-height: 0.9;
+    color: var(--cream);
+    text-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+  }
+  .result-kicker {
+    text-align: center;
+    margin: 0;
+    font-size: 13px;
+    color: #d7ecdf;
+  }
+  .big-score {
+    margin: 0;
+    text-align: center;
+    font-size: clamp(52px, 16vw, 76px);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    letter-spacing: 0.02em;
+  }
+  .record {
+    min-height: 1.2em;
+    margin: 2px 0 6px;
+    text-align: center;
+    color: var(--gold);
+    font-weight: 800;
+    font-size: 14px;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .stats div {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 6px 8px 7px;
+    text-align: center;
+  }
+  .stats span { display: block; font-size: 11px; color: #d5ecdf; }
+  .stats strong {
+    display: block;
+    font-size: 20px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+  .result-best {
+    text-align: center;
+    font-size: 13px;
+    margin: 0 0 10px;
+  }
+
+  #edge {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 6;
+    opacity: 0;
+    box-shadow: inset 0 0 0 14px rgba(255, 42, 32, 0.92);
+  }
+  #edge.on { animation: edge 0.2s linear; }
+  @keyframes edge {
+    0% { opacity: 0; }
+    30% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  #confetti {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 7;
+  }
+  #testbar {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    z-index: 8;
+    background: #10211c;
+    color: var(--cream);
+    border: 2px solid #8fd9a2;
+    border-radius: 12px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.45;
+    max-height: 34vh;
+    overflow: auto;
+  }
+  #testbar.fail { border-color: var(--coral); }
+  #testbar strong { font-size: 16px; }
+  #testbar button {
+    margin-top: 6px;
+    min-height: 36px;
+    border-radius: 8px;
+    border: 1px solid rgba(246, 241, 228, 0.4);
+    background: transparent;
+    color: var(--cream);
+    padding: 4px 10px;
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <a class="back" href="/games/">ゲーム一覧へ戻る</a>
+    <div class="time" id="time">30.0</div>
+    <div class="right">
+      <div class="score" id="score">0</div>
+      <button type="button" id="sound" aria-pressed="false" aria-label="音をオンにする">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path fill="currentColor" d="M3 9h4l5-4v14l-5-4H3z"/>
+          <path class="wave" d="M16 8.5a4.5 4.5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path class="mute-x" d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="snd-tx">オフ</span>
+      </button>
+    </div>
+  </header>
+  <div class="stage">
+    <div class="combo" id="combo" hidden>0連続</div>
+    <div class="board locked" id="board"></div>
+    <div class="card" id="card-title">
+      <div class="panel">
+        <h1>ひょっこりタップ</h1>
+        <p class="flavor">はまのまるい生きもの</p>
+        <ul id="how">
+          <li>穴からひょっこり出たらタップ</li>
+          <li>金色は3点、とげは−3点</li>
+          <li>10連続でふつうが2点</li>
+        </ul>
+        <div class="legend" id="legend"></div>
+        <p class="bests" id="bests"></p>
+        <div class="diffs" role="group" aria-label="難易度">
+          <button type="button" data-diff="easy" aria-pressed="false">かんたん</button>
+          <button type="button" data-diff="normal" aria-pressed="true">ふつう</button>
+          <button type="button" data-diff="hard" aria-pressed="false">むずかしい</button>
+        </div>
+        <button type="button" class="go" id="start">はじめる</button>
+      </div>
+    </div>
+    <div class="card" id="card-count" hidden>
+      <div class="countnum" id="countnum">3</div>
+    </div>
+    <div class="card" id="card-result" hidden>
+      <div class="panel">
+        <p class="result-kicker" id="result-kicker">ふつう</p>
+        <p class="big-score" id="result-score">0</p>
+        <p class="record" id="record"></p>
+        <div class="stats">
+          <div><span>ヒット</span><strong id="st-hits">0</strong></div>
+          <div><span>空振り</span><strong id="st-whiff">0</strong></div>
+          <div><span>命中率</span><strong id="st-acc">0%</strong></div>
+          <div><span>最大連続</span><strong id="st-combo">0</strong></div>
+        </div>
+        <p class="result-best" id="result-best"></p>
+        <button type="button" class="again" id="retry">もう一度</button>
+        <button type="button" class="ghost" id="reselect">難易度をえらぶ</button>
+      </div>
+    </div>
+  </div>
+  <div id="edge"></div>
+  <canvas id="confetti" hidden></canvas>
+  <div id="testbar" hidden></div>
+</div>
+<script>
+(function () {
+  "use strict";
+
+  var SEED = 20261107;
+  var EXPECTED = {
+    easy: { score: 55, hits: 45, whiffs: 15, thorns: 3, acc: 71, maxCombo: 20 },
+    normal: { score: 30, hits: 26, whiffs: 16, thorns: 3, acc: 58, maxCombo: 20 },
+    hard: { score: 4, hits: 11, whiffs: 17, thorns: 3, acc: 35, maxCombo: 11 }
+  };
+  var BEST_KEY = {
+    easy: "hamanoko.hyokkori.best.easy",
+    normal: "hamanoko.hyokkori.best.normal",
+    hard: "hamanoko.hyokkori.best.hard"
+  };
+  var DIFF_NAME = { easy: "かんたん", normal: "ふつう", hard: "むずかしい" };
+  var NAMES = { n: "ぽよん", g: "きんぽよ", s: "いがまる" };
+  var seq = 1;
+
+  var SPIKES = (function () {
+    var s = "";
+    var n = 10;
+    for (var i = 0; i < n; i++) {
+      var a = (i / n) * Math.PI * 2 - Math.PI / 2;
+      var w = 0.16;
+      var p = function (ang, r) {
+        return (70 + Math.cos(ang) * r).toFixed(1) + "," + (96 + Math.sin(ang) * r).toFixed(1);
+      };
+      s += '<polygon points="' + p(a - w, 28) + " " + p(a, 52) + " " + p(a + w, 28) + '" fill="#ff5a3c"/>';
+    }
+    return s;
+  })();
+
+  function mulberry32(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a |= 0;
+      a = (a + 0x6d2b79f5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function phaseOf(time) {
+    if (time < 10000) return { interval: 800, max: 2, show: { n: 1000, g: 600, s: 1200 } };
+    if (time < 20000) return { interval: 600, max: 3, show: { n: 850, g: 510, s: 1200 } };
+    return { interval: 450, max: 4, show: { n: 700, g: 420, s: 1200 } };
+  }
+
+  function floorScore(n) {
+    return n < 0 ? 0 : n;
+  }
+
+  function createRun(difficulty, rng) {
+    var mult = difficulty === "easy" ? 1.3 : difficulty === "hard" ? 0.8 : 1;
+    var holes = [null, null, null, null, null, null, null, null, null];
+    var nextSpawn = 0;
+    var cursor = -10;
+    var score = 0;
+    var hits = 0;
+    var whiffs = 0;
+    var thorns = 0;
+    var combo = 0;
+    var maxCombo = 0;
+    var whiffFired = new Set();
+
+    function showOf(type, at) {
+      return Math.round(phaseOf(at).show[type] * mult);
+    }
+    function alive() {
+      var c = 0;
+      for (var i = 0; i < 9; i++) if (holes[i]) c++;
+      return c;
+    }
+    function trySpawn(at) {
+      var p = phaseOf(at);
+      if (alive() >= p.max) return;
+      var empty = [];
+      for (var i = 0; i < 9; i++) if (!holes[i]) empty.push(i);
+      if (empty.length === 0) return;
+      var hi = empty[Math.floor(rng() * empty.length)];
+      var r = rng();
+      var type = r < 0.78 ? "n" : r < 0.88 ? "g" : "s";
+      if (type === "s" && at < 5000) {
+        var r2 = rng();
+        type = r2 < 0.78 / 0.88 ? "n" : "g";
+      }
+      holes[hi] = { type: type, spawnAt: at, hideAt: at + showOf(type, at), id: seq++ };
+    }
+    function doHit(i) {
+      var c = holes[i];
+      if (!c) return null;
+      if (c.type === "s") {
+        score = floorScore(score - 3);
+        combo = 0;
+        thorns++;
+        holes[i] = null;
+        return { kind: "thorn", type: "s", pts: -3 };
+      }
+      combo += 1;
+      if (combo > maxCombo) maxCombo = combo;
+      var pts = c.type === "n" ? (combo >= 10 ? 2 : 1) : 3;
+      score += pts;
+      hits++;
+      var type = c.type;
+      holes[i] = null;
+      return { kind: "hit", type: type, pts: pts };
+    }
+    function apply(t) {
+      for (var i = 0; i < 9; i++) {
+        if (holes[i] && holes[i].hideAt <= t) holes[i] = null;
+      }
+      while (nextSpawn <= t && nextSpawn < 30000) {
+        var at = nextSpawn;
+        trySpawn(at);
+        nextSpawn = at + phaseOf(at).interval;
+      }
+    }
+    function advanceTo(target) {
+      var gridTarget = Math.min(30000, Math.floor(target / 10) * 10);
+      var next = cursor + 10;
+      while (next <= gridTarget) {
+        apply(next);
+        cursor = next;
+        next += 10;
+      }
+    }
+    function tap(i) {
+      if (i < 0 || i > 8) return { kind: "ignore" };
+      if (!holes[i]) {
+        combo = 0;
+        whiffs++;
+        return { kind: "whiff" };
+      }
+      return doHit(i);
+    }
+    function auto(t) {
+      var i;
+      var c;
+      for (i = 0; i < 9; i++) {
+        c = holes[i];
+        if (c && c.type === "g" && c.spawnAt + 450 <= t) doHit(i);
+      }
+      for (i = 0; i < 9; i++) {
+        c = holes[i];
+        if (c && c.type === "n" && c.spawnAt + 750 <= t) doHit(i);
+      }
+      for (i = 0; i < 9; i++) {
+        c = holes[i];
+        if (c && c.type === "s" && c.spawnAt >= 15000 && c.spawnAt + 900 <= t) doHit(i);
+      }
+      if (t >= 16000 && t < 30000 && t % 700 === 0 && !whiffFired.has(t)) {
+        whiffFired.add(t);
+        var hi = Math.floor(t / 700) % 9;
+        if (!holes[hi]) {
+          combo = 0;
+          whiffs++;
+        }
+      }
+    }
+    function stats() {
+      var taps = hits + whiffs + thorns;
+      return {
+        score: score,
+        hits: hits,
+        whiffs: whiffs,
+        thorns: thorns,
+        acc: taps === 0 ? 0 : Math.round((hits / taps) * 100),
+        maxCombo: maxCombo
+      };
+    }
+    return {
+      holes: holes,
+      advanceTo: advanceTo,
+      tap: tap,
+      auto: auto,
+      stats: stats,
+      combo: function () { return combo; }
+    };
+  }
+
+  function simulate(diff) {
+    var run = createRun(diff, mulberry32(SEED));
+    for (var t = 0; t <= 30000; t += 10) {
+      run.advanceTo(t);
+      run.auto(t);
+    }
+    return run.stats();
+  }
+
+  function creatureMarkup(type, uid) {
+    var body = type === "g" ? "#ffe38a" : type === "s" ? "#d2b0e4" : "#ffd7b8";
+    var belly = type === "g" ? "#fff6cc" : type === "s" ? "#f3e4f8" : "#fff6ea";
+    var accent = type === "g" ? "#e29a12" : "#2f9e62";
+    var tip = type === "g" ? "#fff2a8" : "#8ee0a0";
+    var gid = "cg" + uid;
+    var sprout = "";
+    if (type === "g") {
+      sprout = '<polygon points="70,14 74.2,27 88,27 76.6,35 80.6,48 70,40.2 59.4,48 63.4,35 52,27 65.8,27" fill="' + tip + '" stroke="#e29a12" stroke-width="1"/>';
+    } else if (type === "n") {
+      sprout = '<path d="M70 48c0-14 14-16 16-28" stroke="' + accent + '" stroke-width="4" fill="none" stroke-linecap="round"/>' +
+        '<circle cx="88" cy="16" r="7" fill="' + tip + '"/><circle cx="86" cy="14" r="2.2" fill="#fff"/>';
+    }
+    var eyes = type === "s"
+      ? '<path d="M46 88h16" stroke="#2a2030" stroke-width="3.2" stroke-linecap="round"/>' +
+        '<path d="M78 88h16" stroke="#2a2030" stroke-width="3.2" stroke-linecap="round"/>' +
+        '<path d="M48 84l6-4M90 84l6-4" stroke="#2a2030" stroke-width="2" stroke-linecap="round"/>'
+      : '<ellipse cx="54" cy="88" rx="6.5" ry="7.6" fill="#243028"/>' +
+        '<ellipse cx="86" cy="88" rx="6.5" ry="7.6" fill="#243028"/>' +
+        '<circle cx="56.2" cy="85.2" r="2.1" fill="#fff"/>' +
+        '<circle cx="88.2" cy="85.2" r="2.1" fill="#fff"/>';
+    var mouth = type === "s"
+      ? '<ellipse cx="70" cy="108" rx="6" ry="4.2" fill="#3a2844"/>'
+      : '<path d="M58 107q12 11 24 0" stroke="#243028" stroke-width="2.6" fill="none" stroke-linecap="round"/>';
+    return '<svg viewBox="0 0 140 150" width="100%" height="100%" aria-hidden="true">' +
+      '<defs><radialGradient id="' + gid + '" cx="36%" cy="30%" r="75%">' +
+      '<stop offset="0" stop-color="#fff" stop-opacity="0.9"/>' +
+      '<stop offset="0.28" stop-color="' + body + '"/>' +
+      '<stop offset="1" stop-color="' + body + '"/>' +
+      "</radialGradient></defs>" +
+      '<ellipse cx="70" cy="140" rx="26" ry="5" fill="rgba(0,0,0,.22)"/>' +
+      (type === "s" ? SPIKES : "") +
+      sprout +
+      '<ellipse cx="70" cy="96" rx="38" ry="36" fill="url(#' + gid + ')"/>' +
+      '<ellipse cx="70" cy="108" rx="20" ry="14" fill="' + belly + '"/>' +
+      '<ellipse cx="50" cy="128" rx="9" ry="5.5" fill="' + body + '"/>' +
+      '<ellipse cx="90" cy="128" rx="9" ry="5.5" fill="' + body + '"/>' +
+      '<ellipse cx="30" cy="98" rx="9" ry="6" fill="' + body + '" transform="rotate(-24 30 98)"/>' +
+      '<ellipse cx="110" cy="98" rx="9" ry="6" fill="' + body + '" transform="rotate(24 110 98)"/>' +
+      '<ellipse cx="48" cy="102" rx="6" ry="3.3" fill="#ff8d7d" opacity="0.9"/>' +
+      '<ellipse cx="92" cy="102" rx="6" ry="3.3" fill="#ff8d7d" opacity="0.9"/>' +
+      eyes + mouth +
+      "</svg>";
+  }
+
+  var board = document.getElementById("board");
+  var timeEl = document.getElementById("time");
+  var scoreEl = document.getElementById("score");
+  var comboEl = document.getElementById("combo");
+  var cardTitle = document.getElementById("card-title");
+  var cardCount = document.getElementById("card-count");
+  var cardResult = document.getElementById("card-result");
+  var countNum = document.getElementById("countnum");
+  var soundBtn = document.getElementById("sound");
+  var edge = document.getElementById("edge");
+  var holesEl = [];
+  var pointers = new Set();
+  var state = "title";
+  var difficulty = "normal";
+  var run = null;
+  var raf = 0;
+  var countdownStart = 0;
+  var playStartWall = 0;
+  var shownCount = -1;
+  var soundOn = false;
+  var audioCtx = null;
+  var master = null;
+  var noiseBuf = null;
+  var lastFlash = 0;
+  var confettiRaf = 0;
+  var fxTimers = [];
+
+  for (var i = 0; i < 9; i++) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "hole";
+    b.dataset.i = String(i);
+    b.setAttribute("aria-label", "穴" + (i + 1));
+    b.innerHTML = '<span class="pit"></span><span class="critter"></span><span class="fx"></span>';
+    b.addEventListener("pointerdown", onDown, { passive: false });
+    board.appendChild(b);
+    holesEl.push(b);
+  }
+  board.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  var legend = document.getElementById("legend");
+  [
+    ["n", "1点"],
+    ["g", "3点"],
+    ["s", "−3点"]
+  ].forEach(function (pair, idx) {
+    var fig = document.createElement("figure");
+    fig.className = pair[0];
+    fig.innerHTML = '<div class="mini">' + creatureMarkup(pair[0], "L" + idx) + "</div><figcaption>" + pair[1] + "</figcaption>";
+    legend.appendChild(fig);
+  });
+
+  document.querySelectorAll(".diffs button").forEach(function (btn) {
+    btn.addEventListener("pointerdown", function () {
+      unlock();
+    });
+    btn.addEventListener("click", function () {
+      difficulty = btn.dataset.diff;
+      document.querySelectorAll(".diffs button").forEach(function (other) {
+        other.setAttribute("aria-pressed", other === btn ? "true" : "false");
+      });
+    });
+  });
+
+  document.getElementById("start").addEventListener("pointerdown", function () {
+    unlock();
+    if (state === "title") begin(difficulty);
+  });
+  document.getElementById("retry").addEventListener("pointerdown", function () {
+    unlock();
+    if (state === "result") begin(difficulty);
+  });
+  document.getElementById("reselect").addEventListener("click", function () {
+    if (state === "result") showTitle();
+  });
+  soundBtn.addEventListener("pointerdown", function (e) {
+    e.stopPropagation();
+    unlock();
+    setSound(!soundOn);
+  });
+  window.addEventListener("pointerup", releasePointer);
+  window.addEventListener("pointercancel", releasePointer);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+  });
+
+  function releasePointer(e) {
+    pointers.delete(e.pointerId);
+  }
+
+  function unlock() {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!audioCtx) {
+      try {
+        audioCtx = new AC({ latencyHint: "interactive" });
+      } catch (err) {
+        try { audioCtx = new AC(); } catch (err2) { return; }
+      }
+      master = audioCtx.createGain();
+      master.gain.value = 0.0001;
+      master.connect(audioCtx.destination);
+    }
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    if (!soundOn) master.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+  }
+
+  function setSound(on) {
+    soundOn = on;
+    soundBtn.classList.toggle("is-on", on);
+    soundBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    soundBtn.setAttribute("aria-label", on ? "音をオフにする" : "音をオンにする");
+    soundBtn.querySelector(".snd-tx").textContent = on ? "オン" : "オフ";
+    if (!audioCtx || !master) return;
+    var t = audioCtx.currentTime;
+    master.gain.cancelScheduledValues(t);
+    master.gain.setTargetAtTime(on ? 0.22 : 0.0001, t, 0.02);
+  }
+
+  function tone(freq, dur, type, peak, slide) {
+    if (!audioCtx || !soundOn || !master) return;
+    var t = audioCtx.currentTime;
+    var o = audioCtx.createOscillator();
+    var g = audioCtx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, slide), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g);
+    g.connect(master);
+    o.start(t);
+    o.stop(t + dur + 0.02);
+    o.onended = function () { o.disconnect(); g.disconnect(); };
+  }
+
+  function sfx(kind) {
+    if (!soundOn || !audioCtx) return;
+    if (kind === "hit") {
+      tone(640 * (0.96 + Math.random() * 0.08), 0.09, "sine", 0.2, 300);
+    } else if (kind === "gold") {
+      tone(880, 0.12, "sine", 0.16, 1320);
+      tone(1320, 0.16, "triangle", 0.07, 1760);
+    } else if (kind === "thorn") {
+      tone(98, 0.16, "square", 0.07, 60);
+      if (!noiseBuf) {
+        var len = Math.floor(audioCtx.sampleRate * 0.16);
+        noiseBuf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+        var data = noiseBuf.getChannelData(0);
+        for (var n = 0; n < len; n++) data[n] = (Math.random() * 2 - 1) * Math.pow(1 - n / len, 2);
+      }
+      var src = audioCtx.createBufferSource();
+      src.buffer = noiseBuf;
+      var g = audioCtx.createGain();
+      var f = audioCtx.createBiquadFilter();
+      f.type = "lowpass";
+      f.frequency.value = 420;
+      var t0 = audioCtx.currentTime;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.32, t0 + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.16);
+      src.connect(f); f.connect(g); g.connect(master);
+      src.start(t0); src.stop(t0 + 0.18);
+      src.onended = function () { src.disconnect(); f.disconnect(); g.disconnect(); };
+    } else if (kind === "tick3") tone(784, 0.1, "sine", 0.12);
+    else if (kind === "tick2") tone(659, 0.1, "sine", 0.12);
+    else if (kind === "tick1") tone(523, 0.12, "sine", 0.14);
+    else if (kind === "end") {
+      tone(523, 0.28, "sine", 0.12);
+      tone(659, 0.32, "sine", 0.09);
+      tone(784, 0.36, "sine", 0.07);
+    }
+  }
+
+  function loadBest(diff) {
+    try {
+      var v = localStorage.getItem(BEST_KEY[diff]);
+      if (v == null || v === "") return null;
+      var n = Number(v);
+      if (!Number.isFinite(n) || n < 0) return null;
+      return Math.floor(n);
+    } catch (err) {
+      return null;
+    }
+  }
+  function saveBest(diff, value) {
+    try {
+      localStorage.setItem(BEST_KEY[diff], String(value));
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+  function bestText(diff) {
+    var v = loadBest(diff);
+    return v == null ? "—" : String(v);
+  }
+  function paintBests() {
+    document.getElementById("bests").textContent =
+      "自己ベスト　かんたん " + bestText("easy") +
+      "　ふつう " + bestText("normal") +
+      "　むずかしい " + bestText("hard");
+  }
+
+  function clearFx() {
+    fxTimers.forEach(function (id) { clearTimeout(id); });
+    fxTimers = [];
+    if (confettiRaf) cancelAnimationFrame(confettiRaf);
+    confettiRaf = 0;
+    var canvas = document.getElementById("confetti");
+    canvas.hidden = true;
+  }
+
+  function resetHoles() {
+    holesEl.forEach(function (el, idx) {
+      el.className = "hole";
+      el.dataset.cid = "";
+      el.querySelector(".critter").innerHTML = "";
+      el.querySelector(".fx").replaceChildren();
+      el.setAttribute("aria-label", "穴" + (idx + 1));
+    });
+  }
+
+  function showTitle() {
+    state = "title";
+    run = null;
+    pointers.clear();
+    stopLoop();
+    clearFx();
+    resetHoles();
+    board.classList.add("locked");
+    cardTitle.hidden = false;
+    cardCount.hidden = true;
+    cardResult.hidden = true;
+    comboEl.hidden = true;
+    timeEl.textContent = "30.0";
+    scoreEl.textContent = "0";
+    paintBests();
+  }
+
+  function begin(diff) {
+    difficulty = diff;
+    state = "countdown";
+    run = null;
+    pointers.clear();
+    shownCount = -1;
+    clearFx();
+    resetHoles();
+    board.classList.add("locked");
+    cardTitle.hidden = true;
+    cardResult.hidden = true;
+    cardCount.hidden = false;
+    comboEl.hidden = true;
+    timeEl.textContent = "30.0";
+    scoreEl.textContent = "0";
+    countdownStart = performance.now();
+    updateCountdown(countdownStart);
+    startLoop();
+  }
+
+  function startLoop() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(loop);
+  }
+  function stopLoop() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+  }
+  function loop(now) {
+    raf = requestAnimationFrame(loop);
+    if (state === "countdown") updateCountdown(now);
+    else if (state === "play") updatePlay(now);
+    else stopLoop();
+  }
+
+  function updateCountdown(now) {
+    var elapsed = now - countdownStart;
+    var n = elapsed < 600 ? 3 : elapsed < 1200 ? 2 : 1;
+    if (n !== shownCount) {
+      shownCount = n;
+      countNum.textContent = String(n);
+      sfx("tick" + n);
+    }
+    if (elapsed >= 1800) {
+      playStartWall = countdownStart + 1800;
+      run = createRun(difficulty, function () { return Math.random(); });
+      state = "play";
+      cardCount.hidden = true;
+      board.classList.remove("locked");
+      updatePlay(Math.max(now, playStartWall));
+    }
+  }
+
+  function updatePlay(now) {
+    if (state !== "play" || !run) return;
+    var elapsed = now - playStartWall;
+    if (elapsed >= 30000) {
+      run.advanceTo(30000);
+      syncHoles();
+      timeEl.textContent = "0.0";
+      finish();
+      return;
+    }
+    run.advanceTo(elapsed);
+    syncHoles();
+    timeEl.textContent = (Math.max(0, 30000 - elapsed) / 1000).toFixed(1);
+  }
+
+  function syncHoles() {
+    if (!run) return;
+    for (var i = 0; i < 9; i++) {
+      var c = run.holes[i];
+      var el = holesEl[i];
+      var id = c ? String(c.id) : "";
+      if ((el.dataset.cid || "") === id) continue;
+      if (c) {
+        el.dataset.cid = id;
+        el.classList.remove("squash", "down", "settled", "n", "g", "s");
+        el.classList.add("up", c.type);
+        el.querySelector(".critter").innerHTML = creatureMarkup(c.type, c.id);
+        el.setAttribute("aria-label", "穴" + (i + 1) + " " + NAMES[c.type]);
+      } else if (el.dataset.cid) {
+        if (!el.classList.contains("squash")) {
+          el.classList.remove("up", "settled");
+          el.classList.add("down");
+        }
+        el.dataset.cid = "";
+        el.setAttribute("aria-label", "穴" + (i + 1));
+      }
+    }
+  }
+
+  holesEl.forEach(function (el) {
+    el.addEventListener("animationend", function (e) {
+      if (e.animationName === "pop") el.classList.add("settled");
+      if (e.animationName === "squash" || e.animationName === "retreat") {
+        el.classList.remove("squash", "down", "up", "settled", "n", "g", "s");
+        el.querySelector(".critter").innerHTML = "";
+      }
+    });
+  });
+
+  function onDown(e) {
+    if (e.button !== 0 && e.button != null) return;
+    if (pointers.has(e.pointerId)) return;
+    pointers.add(e.pointerId);
+    if (e.cancelable) e.preventDefault();
+    if (state !== "play" || !run) return;
+    var el = e.currentTarget;
+    var i = Number(el.dataset.i);
+    var before = run.holes[i];
+    var res = run.tap(i);
+    if (res.kind === "whiff") {
+      el.classList.remove("miss");
+      void el.offsetWidth;
+      el.classList.add("miss");
+      var missTimer = setTimeout(function () { el.classList.remove("miss"); }, 160);
+      fxTimers.push(missTimer);
+    } else if (before) {
+      el.classList.remove("up", "settled");
+      el.classList.add("squash");
+      el.dataset.cid = "";
+      burst(el, before.type);
+      floater(el, res);
+      if (res.kind === "thorn") flashEdge();
+      sfx(res.kind === "thorn" ? "thorn" : before.type === "g" ? "gold" : "hit");
+    }
+    scoreEl.textContent = String(run.stats().score);
+    paintCombo();
+  }
+
+  function paintCombo() {
+    if (!run) return;
+    var c = run.combo();
+    if (c >= 2) {
+      comboEl.hidden = false;
+      comboEl.textContent = c + "連続";
+      comboEl.classList.toggle("hot", c >= 10);
+    } else {
+      comboEl.hidden = true;
+    }
+  }
+
+  function burst(el, type) {
+    var layer = el.querySelector(".fx");
+    layer.replaceChildren();
+    var dirs = [[-22, -28], [18, -32], [-28, -8], [24, -6]];
+    for (var k = 0; k < 4; k++) {
+      var s = document.createElement("i");
+      s.className = "spark " + type;
+      s.style.setProperty("--dx", dirs[k][0] + "px");
+      s.style.setProperty("--dy", dirs[k][1] + "px");
+      layer.appendChild(s);
+    }
+    var timer = setTimeout(function () { layer.replaceChildren(); }, 260);
+    fxTimers.push(timer);
+  }
+
+  function floater(el, res) {
+    var f = document.createElement("span");
+    f.className = "floater " + (res.type || "");
+    f.textContent = res.pts > 0 ? "+" + res.pts : "−3";
+    el.appendChild(f);
+    var timer = setTimeout(function () { f.remove(); }, 480);
+    fxTimers.push(timer);
+  }
+
+  function flashEdge() {
+    var now = performance.now();
+    if (now - lastFlash < 500) return;
+    lastFlash = now;
+    edge.classList.remove("on");
+    void edge.offsetWidth;
+    edge.classList.add("on");
+  }
+
+  function finish() {
+    if (state !== "play" || !run) return;
+    state = "result";
+    stopLoop();
+    board.classList.add("locked");
+    var st = run.stats();
+    var prev = loadBest(difficulty);
+    var celebrate = prev == null ? st.score > 0 : st.score > prev;
+    if (prev == null || st.score > prev) saveBest(difficulty, st.score);
+    document.getElementById("result-kicker").textContent = DIFF_NAME[difficulty];
+    document.getElementById("result-score").textContent = String(st.score);
+    document.getElementById("st-hits").textContent = String(st.hits);
+    document.getElementById("st-whiff").textContent = String(st.whiffs);
+    document.getElementById("st-acc").textContent = st.acc + "%";
+    document.getElementById("st-combo").textContent = String(st.maxCombo);
+    document.getElementById("record").textContent = celebrate ? "ベスト更新！" : "";
+    var best = loadBest(difficulty);
+    document.getElementById("result-best").textContent = "自己ベスト　" + (best == null ? "—" : String(best));
+    cardResult.hidden = false;
+    comboEl.hidden = true;
+    scoreEl.textContent = String(st.score);
+    if (celebrate) confetti();
+    sfx("end");
+    paintBests();
+  }
+
+  function confetti() {
+    var canvas = document.getElementById("confetti");
+    var app = document.getElementById("app");
+    var rect = app.getBoundingClientRect();
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    canvas.hidden = false;
+    var ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var colors = ["#ff6b4a", "#ffc83d", "#f6f1e4", "#8ee0a0", "#ffd0c6"];
+    var pieces = [];
+    for (var i = 0; i < 42; i++) {
+      pieces.push({
+        x: rect.width * (0.15 + Math.random() * 0.7),
+        y: -10 - Math.random() * rect.height * 0.25,
+        vx: (Math.random() - 0.5) * 90,
+        vy: 180 + Math.random() * 220,
+        w: 6 + Math.random() * 5,
+        h: 8 + Math.random() * 6,
+        color: colors[i % colors.length],
+        spin: Math.random() * Math.PI,
+        vr: (Math.random() - 0.5) * 8
+      });
+    }
+    var t0 = performance.now();
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function frame(now) {
+      var k = (now - t0) / 1200;
+      if (k >= 1) {
+        ctx.clearRect(0, 0, rect.width, rect.height);
+        canvas.hidden = true;
+        confettiRaf = 0;
+        return;
+      }
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      for (var p = 0; p < pieces.length; p++) {
+        var pc = pieces[p];
+        var y = reduce ? rect.height * 0.2 + p * 4 : pc.y + pc.vy * (k * 1.2);
+        var x = reduce ? pc.x : pc.x + pc.vx * k;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(pc.spin + (reduce ? 0 : pc.vr * k));
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = pc.color;
+        ctx.fillRect(-pc.w / 2, -pc.h / 2, pc.w, pc.h);
+        ctx.restore();
+      }
+      confettiRaf = requestAnimationFrame(frame);
+    }
+    confettiRaf = requestAnimationFrame(frame);
+  }
+
+  function sameStats(a, b) {
+    return a.score === b.score && a.hits === b.hits && a.whiffs === b.whiffs &&
+      a.thorns === b.thorns && a.acc === b.acc && a.maxCombo === b.maxCombo;
+  }
+
+  function runSelfTest() {
+    var lines = [];
+    var pass = true;
+    var how = document.querySelectorAll("#how li");
+    if (how.length !== 3 || Array.prototype.some.call(how, function (li) { return Array.from(li.textContent.trim()).length > 25; })) {
+      pass = false;
+      lines.push("遊び方の行数が規定外");
+    }
+    if (!(floorScore(-3) === 0 && floorScore(0) === 0 && floorScore(2) === 2)) {
+      pass = false;
+      lines.push("得点の下限が壊れている");
+    }
+    ["easy", "normal", "hard"].forEach(function (diff) {
+      var first = simulate(diff);
+      for (var n = 0; n < 19; n++) {
+        var again = simulate(diff);
+        if (!sameStats(first, again)) pass = false;
+      }
+      if (!sameStats(first, EXPECTED[diff])) {
+        pass = false;
+        lines.push(DIFF_NAME[diff] + " 期待 " + EXPECTED[diff].score + "点 / 実際 " + first.score + "点");
+      } else {
+        lines.push(DIFF_NAME[diff] + " " + first.score + "点・ヒット" + first.hits + "・空振り" + first.whiffs + "・命中率" + first.acc + "%・最大" + first.maxCombo);
+      }
+    });
+    var stress = true;
+    try {
+      for (var g = 0; g < 20; g++) {
+        var trial = createRun("normal", mulberry32(4000 + g));
+        for (var tt = 0; tt <= 30000; tt += 100) {
+          trial.advanceTo(tt);
+          trial.tap(g % 9);
+        }
+        if (trial.stats().score < 0) stress = false;
+      }
+      var still = createRun("normal", mulberry32(9));
+      still.tap(0);
+      if (still.stats().whiffs !== 1) stress = false;
+    } catch (err) {
+      stress = false;
+    }
+    if (!stress) {
+      pass = false;
+      lines.push("連続プレイで停止");
+    }
+    var inputOk = true;
+    try {
+      pointers.clear();
+      state = "play";
+      run = createRun("normal", mulberry32(7));
+      var fire = function (id, idx) {
+        holesEl[idx].dispatchEvent(new PointerEvent("pointerdown", {
+          pointerId: id, bubbles: true, cancelable: true, button: 0
+        }));
+      };
+      var up = function (id) {
+        window.dispatchEvent(new PointerEvent("pointerup", { pointerId: id, bubbles: true }));
+      };
+      fire(11, 0);
+      fire(12, 1);
+      fire(11, 2);
+      if (run.stats().whiffs !== 2) inputOk = false;
+      up(11);
+      up(12);
+      fire(11, 2);
+      if (run.stats().whiffs !== 3) inputOk = false;
+      var held = run.stats().whiffs;
+      holesEl[3].dispatchEvent(new PointerEvent("pointermove", { pointerId: 11, bubbles: true }));
+      if (run.stats().whiffs !== held) inputOk = false;
+    } catch (err2) {
+      inputOk = false;
+    }
+    pointers.clear();
+    run = null;
+    state = "title";
+    if (!inputOk) {
+      pass = false;
+      lines.push("入力の判定が規定と違う");
+    }
+    var store = "ok";
+    try {
+      var key = BEST_KEY.normal;
+      var prev = localStorage.getItem(key);
+      localStorage.setItem(key, "77");
+      if (localStorage.getItem(key) !== "77") store = "bad";
+      if (prev == null) localStorage.removeItem(key);
+      else localStorage.setItem(key, prev);
+    } catch (err3) {
+      store = "skip";
+    }
+    if (store === "bad") {
+      pass = false;
+      lines.push("記録の書き込みに失敗");
+    }
+    var bar = document.getElementById("testbar");
+    bar.classList.toggle("fail", !pass);
+    bar.dataset.result = pass ? "PASS" : "FAIL";
+    var hole = holesEl[0].getBoundingClientRect();
+    bar.innerHTML = "<strong>" + (pass ? "PASS" : "FAIL") + "</strong><br>" +
+      lines.map(function (line) { return line; }).join("<br>") +
+      "<br>20回一致 " + (stress ? "OK" : "NG") +
+      " / 入力 " + (inputOk ? "OK" : "NG") +
+      " / 記録 " + (store === "skip" ? "この環境では保存できない" : store === "ok" ? "OK" : "NG") +
+      " / 穴 " + hole.width.toFixed(1) + "px" +
+      '<br><button type="button" id="test-close">とじる</button>';
+    bar.hidden = false;
+    document.getElementById("test-close").addEventListener("click", function () {
+      bar.hidden = true;
+    });
+    showTitle();
+  }
+
+  paintBests();
+  var params = new URLSearchParams(location.search);
+  if (params.get("test") === "1") runSelfTest();
+})();
+</script>
+</body>
+</html>
